@@ -202,7 +202,7 @@
 		},
 		{
 			"ImportPath": "github.com/mijia/adoc",
-			"Rev": "f5cf505294f9a693458176234842b9b5972719d5"
+			"Rev": "b13894c1c54204ed818a345d2a5d7fc30f0c7239"
 		},
 		{
 			"ImportPath": "github.com/mijia/go-generics",

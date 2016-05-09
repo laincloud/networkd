@@ -120,6 +120,11 @@ type PortBinding struct {
 	HostPort string
 }
 
+type Networks struct {
+	Gateway   string
+	IPAddress string
+}
+
 type NetworkSettings struct {
 	Bridge                 string
 	Gateway                string
@@ -132,6 +137,7 @@ type NetworkSettings struct {
 	LinkLocalIPv6PrefixLen int
 	MacAddress             string
 	Ports                  map[string][]PortBinding
+	Networks               map[string]Networks
 }
 
 // ContainerState defines container running state from inspection
@@ -187,6 +193,25 @@ type ContainerDetail struct {
 	Node            SwarmNode // swarm api
 }
 
+type NetworkOptions struct {
+	Container      string
+	EndpointConfig EndpointConfig
+	Force          bool
+}
+
+type IPAMConfig struct {
+	IPv4Address string
+	IPv6Address string
+}
+
+type EndpointConfig struct {
+	IPAMConfig IPAMConfig
+}
+
+type NetworkingConfig struct {
+	EndpointsConfig map[string]EndpointConfig
+}
+
 // ListContainers returns containers data, showAll flag defines if you want to show all the containers including the stopped ones
 func (client *DockerClient) ListContainers(showAll, showSize bool, filters ...string) ([]Container, error) {
 	v := url.Values{}
@@ -217,13 +242,15 @@ func (client *DockerClient) InspectContainer(id string) (ContainerDetail, error)
 	}
 }
 
-func (client *DockerClient) CreateContainer(containerConf ContainerConfig, hostConf HostConfig, name ...string) (string, error) {
+func (client *DockerClient) CreateContainer(containerConf ContainerConfig, hostConf HostConfig, networkingConf NetworkingConfig, name ...string) (string, error) {
 	var config struct {
 		ContainerConfig
-		HostConfig HostConfig
+		HostConfig       HostConfig
+		NetworkingConfig NetworkingConfig
 	}
 	config.ContainerConfig = containerConf
 	config.HostConfig = hostConf
+	config.NetworkingConfig = networkingConf
 
 	if body, err := json.Marshal(config); err != nil {
 		return "", err
@@ -247,6 +274,32 @@ func (client *DockerClient) CreateContainer(containerConf ContainerConfig, hostC
 			}
 			return resp.Id, err
 		}
+	}
+}
+
+func (client *DockerClient) ConnectContainer(networkName string, id string, ipAddr string) error {
+	var nc NetworkOptions
+	nc.Container = id
+	nc.EndpointConfig.IPAMConfig.IPv4Address = ipAddr
+	if body, err := json.Marshal(nc); err != nil {
+		return err
+	} else {
+		uri := fmt.Sprintf("networks/%s/connect", networkName)
+		_, err := client.sendRequest("POST", uri, body, nil)
+		return err
+	}
+}
+
+func (client *DockerClient) DisconnectContainer(networkName string, id string, force bool) error {
+	var nc NetworkOptions
+	nc.Container = id
+	nc.Force = force
+	if body, err := json.Marshal(nc); err != nil {
+		return err
+	} else {
+		uri := fmt.Sprintf("networks/%s/disconnect", networkName)
+		_, err := client.sendRequest("POST", uri, body, nil)
+		return err
 	}
 }
 
