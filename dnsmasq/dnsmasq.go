@@ -329,9 +329,8 @@ func (self *Server) WatchDnsmasqServer(watchCh <-chan struct{}) {
 						"domain": domain,
 						"server": serv,
 					}).Debug("Get domain config from lainlet")
-
-					self.servers = servers
 				}
+				self.servers = servers
 				self.eventCh <- 1
 			case <-watchCh:
 				return
