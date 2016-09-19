@@ -79,7 +79,7 @@ func (self *Server) AddVirtualIp(ip string, port string, config JSONVirtualIpCon
 		modifiedTime:  currentUnixTime,
 	}
 	for _, v := range config.Ports {
-		// default proto
+		// default proto tcp
 		proto := v.Proto
 		if proto == "" {
 			proto = "tcp"
@@ -198,10 +198,11 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 	}).Debug("Apply virtual ip")
 
 	state := LockerStateLocked
+	var err error
 
 	if item.port == "" {
 		// check locked ip hostname
-		state, err := self.LockVirtualIp(item.ip)
+		state, err = self.LockVirtualIp(item.ip)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"ip":  item.ip,
