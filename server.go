@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-    "github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
+	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	etcd "github.com/coreos/etcd/client"
 	"github.com/docker/leadership"
 	"github.com/docker/libkv"
