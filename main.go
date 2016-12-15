@@ -37,6 +37,7 @@ func main() {
 		dnsmasq         = flag.Bool("dnsmasq", false, "Enable/Disable dnsmasq.")
 		dnsmasqHost     = flag.String("dnsmasq.host", "/etc/dnsmasq.hosts", "Dnsmasq host filename")
 		dnsmasqServer   = flag.String("dnsmasq.server", "/etc/dnsmasq.servers", "Dnsmasq server filename")
+		dnsmasqExtra    = flag.String("dnsmasq.extra", "/etc/dnsmasq.d/extra.conf", "Dnsmasq extra domain filename")
 		printVersion    = flag.Bool("version", false, "Print the version and exit.")
 		verbose         = flag.Bool("verbose", false, "Print more info.")
 	)
@@ -95,7 +96,7 @@ func main() {
 	server.InitDomain(*domain)
 
 	if *dnsmasq {
-		server.InitDnsmasq(*dnsmasqHost, *dnsmasqServer)
+		server.InitDnsmasq(*dnsmasqHost, *dnsmasqServer, *dnsmasqExtra)
 	}
 
 	if *resolvConf {

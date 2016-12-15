@@ -67,6 +67,7 @@ type Server struct {
 	dnsmasqFlag   bool
 	dnsmasqHost   string
 	dnsmasqServer string
+	dnsmasqExtra  string
 	// swarm
 	swarmFlag      bool
 	swarmStopCh    chan struct{}
@@ -260,11 +261,12 @@ func (self *Server) InitAddress(ip string) {
 	log.Info(fmt.Sprintf("HostIP %s", self.ip))
 }
 
-func (self *Server) InitDnsmasq(host string, server string) {
+func (self *Server) InitDnsmasq(host string, server string, extra string) {
 	// TODO(xutao) check host & server
 	self.dnsmasqHost = host
 	self.dnsmasqServer = server
-	self.dnsmasq = dnsmasq.New(self.ip, self.libkv, self.lainlet, log, host, server)
+	self.dnsmasqExtra = extra
+	self.dnsmasq = dnsmasq.New(self.ip, self.libkv, self.lainlet, log, host, server, extra)
 	self.tinydnsStopCh = make(chan struct{})
 	self.tinydnsIsRunning = false
 	self.swarmStopCh = make(chan struct{})
