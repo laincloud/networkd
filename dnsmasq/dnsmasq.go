@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	"github.com/docker/libkv/store"
 	lainlet "github.com/laincloud/lainlet/client"
 	"github.com/laincloud/networkd/util"
@@ -13,15 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 )
 
 const DnsmaqdPidfile = "/var/run/dnsmasq.pid"
 const EtcdAddressPrefixKey = "dnsmasq_addresses"
 const EtcdServerPrefixKey = "dnsmasq_servers"
 const EtcdPrefixKey = "/lain/config"
-
-type watcherCallback func(data interface{})
 
 type AddressItem struct {
 	ip     string
@@ -44,12 +40,12 @@ type Server struct {
 	cnfEvCh        chan int
 	addresses      []AddressItem
 	servers        []ServerItem
-	extras         []AddressItem
+	domains        []AddressItem
 	lainlet        *lainlet.Client
 	log            *logrus.Logger
 	hostFilename   string
 	serverFilename string
-	extraFilename  string
+	domainFilename string
 }
 
 type JSONAddressConfig struct {
@@ -62,7 +58,7 @@ type JSONServerConfig struct {
 }
 
 func New(ip string, kv store.Store, lainlet *lainlet.Client, log *logrus.Logger,
-	host string, server string, extra string) *Server {
+	host string, server string, domain string) *Server {
 	return &Server{
 		ip:             ip,
 		log:            log,
@@ -74,7 +70,7 @@ func New(ip string, kv store.Store, lainlet *lainlet.Client, log *logrus.Logger,
 		isRunning:      false,
 		hostFilename:   host,
 		serverFilename: server,
-		extraFilename:  extra,
+		domainFilename: domain,
 	}
 }
 
@@ -122,7 +118,7 @@ func (self *Server) StopDnsmasqd() {
 }
 
 func (self *Server) RestartDnsmasq() {
-	err := util.ExecCommand("systemctl", "restart", "dnsmasq")
+	_, err := util.ExecCommand("systemctl", "restart", "dnsmasq")
 	if err != nil {
 		self.log.WithFields(logrus.Fields{
 			"err": err,
@@ -173,7 +169,7 @@ func (self *Server) ReloadDnsmasq() {
 
 func (self *Server) WatchDnsmasqAddress(watchCh <-chan struct{}) {
 	keyPrefixLength := len(EtcdAddressPrefixKey) + 1
-	self.watchConfig(EtcdAddressPrefixKey, watchCh, func(addrs interface{}) {
+	util.WatchConfig(self.log, self.lainlet, EtcdAddressPrefixKey, watchCh, func(addrs interface{}) {
 		var addresses []AddressItem
 		for key, value := range addrs.(map[string]interface{}) {
 			domain := key[keyPrefixLength:]
@@ -224,7 +220,7 @@ func (self *Server) WatchDnsmasqAddress(watchCh <-chan struct{}) {
 
 func (self *Server) WatchDnsmasqServer(watchCh <-chan struct{}) {
 	keyPrefixLength := len(EtcdServerPrefixKey) + 1
-	self.watchConfig(EtcdServerPrefixKey, watchCh, func(addrs interface{}) {
+	util.WatchConfig(self.log, self.lainlet, EtcdServerPrefixKey, watchCh, func(addrs interface{}) {
 		var servers []ServerItem
 		for key, value := range addrs.(map[string]interface{}) {
 			domain := key[keyPrefixLength:]
@@ -292,11 +288,11 @@ func (self *Server) SaveServers() {
 
 func (self *Server) SaveExtras() {
 	data := []byte{}
-	for _, serv := range self.extras {
+	for _, serv := range self.domains {
 		content := fmt.Sprintf("address=/%s/%s\n", serv.domain, serv.ip)
 		data = append(data, content...)
 	}
-	ioutil.WriteFile(self.extraFilename, data, 0644)
+	ioutil.WriteFile(self.domainFilename, data, 0644)
 }
 
 func (self *Server) AddAddress(addressDomain string, addressIps []string, addressType string) {
@@ -352,59 +348,5 @@ func (self *Server) AddServer(domain string, servers []string) {
 			"err":   err,
 		}).Error("Cannot put dnsmasq server")
 		return
-	}
-}
-
-func (self *Server) watchConfig(configKeyPrefix string, watchCh <-chan struct{}, callback watcherCallback) {
-	url := fmt.Sprintf("/v2/configwatcher?target=%s&heartbeat=5", configKeyPrefix)
-	retryCounter := 0
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	for {
-		breakWatch := false
-		ch, err := self.lainlet.Watch(url, ctx)
-		if err != nil {
-			self.log.WithFields(logrus.Fields{
-				"err":          err,
-				"retryCounter": retryCounter,
-			}).Error("Fail to connect lainlet")
-			if retryCounter > 3 {
-				time.Sleep(30 * time.Second)
-			} else {
-				time.Sleep(1 * time.Second)
-			}
-			retryCounter++
-			continue
-		}
-		retryCounter = 0
-		for {
-			select {
-			case event, ok := <-ch:
-				if !ok {
-					breakWatch = true
-					break
-				}
-				if event.Id == 0 {
-					// lainlet error for etcd down
-					if event.Event == "error" {
-						self.log.WithFields(logrus.Fields{
-							"id":    event.Id,
-							"event": event.Event,
-						}).Error("Fail to watch lainlet")
-						time.Sleep(5 * time.Second)
-					}
-					continue
-				}
-				var addrs interface{}
-				err = json.Unmarshal(event.Data, &addrs)
-				callback(addrs)
-			case <-watchCh:
-				return
-			}
-			if breakWatch {
-				break
-			}
-		}
-		self.log.Error("Fail to watch lainlet")
 	}
 }

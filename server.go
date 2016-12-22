@@ -13,6 +13,7 @@ import (
 	kvetcd "github.com/docker/libkv/store/etcd"
 	"github.com/fsouza/go-dockerclient"
 	lainlet "github.com/laincloud/lainlet/client"
+	"github.com/laincloud/networkd/acl"
 	"github.com/laincloud/networkd/dnsmasq"
 	"net"
 	"os"
@@ -67,7 +68,10 @@ type Server struct {
 	dnsmasqFlag   bool
 	dnsmasqHost   string
 	dnsmasqServer string
-	dnsmasqExtra  string
+	dnsmasqDomain string
+	//Acl
+	acl     *acl.Acl
+	aclFlag bool
 	// swarm
 	swarmFlag      bool
 	swarmStopCh    chan struct{}
@@ -123,12 +127,13 @@ func init() {
 	kvetcd.Register()
 }
 
-func (self *Server) InitFlag(dnsmasq bool, tinydns bool, swarm bool, webrouter bool, deployd bool, resolvConf bool) {
+func (self *Server) InitFlag(dnsmasq bool, tinydns bool, swarm bool, webrouter bool, deployd bool, acl bool, resolvConf bool) {
 	self.dnsmasqFlag = dnsmasq
 	self.tinydnsFlag = tinydns
 	self.swarmFlag = swarm
 	self.webrouterFlag = webrouter
 	self.deploydFlag = deployd
+	self.aclFlag = acl
 	self.resolvConfFlag = resolvConf
 }
 
@@ -261,16 +266,20 @@ func (self *Server) InitAddress(ip string) {
 	log.Info(fmt.Sprintf("HostIP %s", self.ip))
 }
 
-func (self *Server) InitDnsmasq(host string, server string, extra string) {
+func (self *Server) InitDnsmasq(host string, server string, domain string) {
 	// TODO(xutao) check host & server
 	self.dnsmasqHost = host
 	self.dnsmasqServer = server
-	self.dnsmasqExtra = extra
-	self.dnsmasq = dnsmasq.New(self.ip, self.libkv, self.lainlet, log, host, server, extra)
+	self.dnsmasqDomain = domain
+	self.dnsmasq = dnsmasq.New(self.ip, self.libkv, self.lainlet, log, host, server, domain)
 	self.tinydnsStopCh = make(chan struct{})
 	self.tinydnsIsRunning = false
 	self.swarmStopCh = make(chan struct{})
 	self.swarmIsRunning = false
+}
+
+func (self *Server) InitAcl() {
+	self.acl = acl.New(log, self.lainlet)
 }
 
 func (self *Server) InitWebrouter() {
@@ -1232,6 +1241,16 @@ func (self *Server) StopDnsmasq() {
 	self.dnsmasq.StopDnsmasqd()
 }
 
+func (self *Server) RunAcl() {
+	log.Info("Run Acl")
+	go self.acl.RunAcl()
+}
+
+func (self *Server) StopAcl() {
+	log.Info("Stop Acl")
+	self.acl.StopAcl()
+}
+
 func (self *Server) RunWebrouter() {
 	if self.webrouterIsRunning {
 		return
@@ -1372,6 +1391,9 @@ func (self *Server) Run() {
 	if self.dnsmasqFlag {
 		self.RunDnsmasq()
 	}
+	if self.aclFlag {
+		self.RunAcl()
+	}
 	self.RunLainlet()
 	self.RunSignal()
 
@@ -1391,6 +1413,9 @@ func (self *Server) Stop() {
 	}
 	if self.dnsmasqFlag {
 		self.StopDnsmasq()
+	}
+	if self.aclFlag {
+		self.StopAcl()
 	}
 	if self.webrouterFlag {
 		self.StopWebrouter()

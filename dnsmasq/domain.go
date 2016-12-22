@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/laincloud/networkd/util"
 )
 
 const EtcdDnsExtraPrefixKey = "extra_domains"
 const EtcdVipPrefixKey = "vip"
 
 func (self *Server) WatchDnsmasqExtra(watchCh <-chan struct{}) {
-	self.watchConfig(EtcdDnsExtraPrefixKey, watchCh, func(datas interface{}) {
-		var extras []AddressItem
+	util.WatchConfig(self.log, self.lainlet, EtcdDnsExtraPrefixKey, watchCh, func(datas interface{}) {
+		var domainAddrs []AddressItem
 		ip := self.FetchVip()
 		for key, value := range datas.(map[string]interface{}) {
 			self.log.WithFields(logrus.Fields{
@@ -28,19 +29,19 @@ func (self *Server) WatchDnsmasqExtra(watchCh <-chan struct{}) {
 				continue
 			}
 			for _, domain := range domains {
-				extras = append(extras, AddressItem{
+				domainAddrs = append(domainAddrs, AddressItem{
 					ip:     ip,
 					domain: domain,
 				})
 			}
 		}
-		self.extras = extras
+		self.domains = domainAddrs
 		self.cnfEvCh <- 1
 	})
 }
 
 func (self *Server) WatchVip(watchCh <-chan struct{}) {
-	self.watchConfig(EtcdVipPrefixKey, watchCh, func(datas interface{}) {
+	util.WatchConfig(self.log, self.lainlet, EtcdVipPrefixKey, watchCh, func(datas interface{}) {
 		if len(datas.(map[string]interface{})) == 0 {
 			self.vip = ""
 		} else {
@@ -53,8 +54,8 @@ func (self *Server) WatchVip(watchCh <-chan struct{}) {
 			}
 		}
 		ip := self.FetchVip()
-		for i, _ := range self.extras {
-			self.extras[i].ip = ip
+		for i, _ := range self.domains {
+			self.domains[i].ip = ip
 		}
 		self.cnfEvCh <- 1
 	})
