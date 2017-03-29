@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/Sirupsen/logrus"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/laincloud/networkd/acl"
 )
 
 // TODO(xutao) support more interfaces
@@ -21,12 +23,6 @@ type ItemAcl struct {
 	action  string
 	comment string
 }
-
-const IptablesNotFound = "iptables: No chain/target/match by that name."
-const IptablesLocked = "Another app is currently holding the xtables lock."
-const IptablesChainFound = "iptables: Chain already exists."
-const CalicoRuleExist = "Rule already present, skipping."
-const CalicoProfileNotExist = "not found."
 
 func doArp(ip string, netInterface string) bool {
 	// arping -c 4 -w 3 -U -I eth0 10.106.170.202
@@ -121,7 +117,7 @@ func initIptablesChain(name string) {
 	out, err := doCmd(cmdName, cmdArgs)
 	if err != nil {
 		message = out.String()
-		if !strings.Contains(message, IptablesNotFound) {
+		if !strings.Contains(message, acl.IptablesNotFound) {
 			log.Print(message)
 			log.Fatal(err)
 		}
@@ -132,7 +128,7 @@ func initIptablesChain(name string) {
 		out, err = doCmd(cmdName, cmdArgs)
 		if err != nil {
 			message = out.String()
-			if !strings.Contains(message, IptablesChainFound) {
+			if !strings.Contains(message, acl.IptablesChainFound) {
 				log.Print(message)
 				log.Fatal(err)
 			}
@@ -146,7 +142,7 @@ func initIptablesChain(name string) {
 	out, err = doCmd(cmdName, cmdArgs)
 	if err != nil {
 		message := out.String()
-		if !strings.Contains(message, IptablesNotFound) {
+		if !strings.Contains(message, acl.IptablesNotFound) {
 			log.Print(message)
 			log.Fatal(err)
 		}
@@ -177,7 +173,7 @@ func doIptablesCheck(ip string, port string, containerIp string, containerPort s
 		return true
 	}
 	message := out.String()
-	if !strings.Contains(message, IptablesNotFound) {
+	if !strings.Contains(message, acl.IptablesNotFound) {
 		log.Print(message)
 		log.Fatal(err)
 	}
@@ -337,10 +333,10 @@ func doIptablesCheckAcl(item *ItemAcl) bool {
 			return true
 		}
 		message = out.String()
-		if strings.Contains(message, IptablesNotFound) {
+		if strings.Contains(message, acl.IptablesNotFound) {
 			return false
 		}
-		if strings.Contains(message, IptablesLocked) {
+		if strings.Contains(message, acl.IptablesLocked) {
 			time.Sleep(15 * time.Second)
 			continue
 		}
@@ -427,7 +423,7 @@ func doCalicoAddProfileRule(name string, proto string, port string) bool {
 		return true
 	}
 	message := out.String()
-	if !strings.Contains(message, CalicoProfileNotExist) {
+	if !strings.Contains(message, acl.CalicoProfileNotExist) {
 		log.Print(message)
 		log.Fatal(err)
 	}
@@ -448,7 +444,7 @@ func doCalicoAddProfileDefaultRule(name string) bool {
 		return true
 	}
 	message := out.String()
-	if !strings.Contains(message, CalicoProfileNotExist) {
+	if !strings.Contains(message, acl.CalicoProfileNotExist) {
 		log.Print(message)
 		log.Fatal(err)
 	}
