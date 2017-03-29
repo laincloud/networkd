@@ -1016,7 +1016,7 @@ func (self *Server) LockVirtualIp(ip string) (state int, err error) {
 			context.Background(),
 			key,
 			value,
-			&etcd.SetOptions{PrevExist: etcd.PrevNoExist},
+			&etcd.SetOptions{PrevExist: etcd.PrevNoExist, TTL: 30 * time.Second},
 		)
 
 		if err != nil {
@@ -1025,6 +1025,18 @@ func (self *Server) LockVirtualIp(ip string) (state int, err error) {
 				case etcd.ErrorCodeNodeExist:
 					lockOwner := self.GetLockedVipHostname(ip)
 					if lockOwner != "" && lockOwner == self.hostname {
+						// refresh ttl
+						if _, e := kapi.Set(
+							context.Background(),
+							key,
+							value,
+							&etcd.SetOptions{PrevExist: etcd.PrevExist, TTL: 30 * time.Second},
+						); e != nil {
+							log.WithFields(logrus.Fields{
+								"err": e,
+								"key": key,
+							}).Error("fresh leader key ttl Failed")
+						}
 						return LockerStateLocked, nil
 					}
 					return LockerStateUnlocked, nil

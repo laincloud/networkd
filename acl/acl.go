@@ -13,6 +13,8 @@ const IptablesChainRulesFound = "iptables: Bad rule (does a matching rule exist 
 const IptablesLocked = "Another app is currently holding the xtables lock.\n"
 const IptablesChainFound = "iptables: Chain already exists.\n"
 const IptablesRuleFound = "iptables: Rule already exists.\n"
+const CalicoRuleExist = "Rule already present, skipping."
+const CalicoProfileNotExist = "not found."
 
 const CMD_IPTABLES = "iptables"
 
@@ -272,7 +274,6 @@ func (self *Acl) StopAcl() {
 	}
 	self.isRunning = false
 	self.cleanAllRules()
-	self.log.Error("StopAcl over")
 }
 
 func (self *Acl) reconfigWhiteListIps() {
