@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/laincloud/networkd/acl"
+	"github.com/laincloud/networkd/util"
 )
 
 // TODO(xutao) support more interfaces
@@ -30,7 +28,7 @@ func doArp(ip string, netInterface string) bool {
 	cmdArgs := []string{
 		"-c", "4", "-w", "3", "-U", "-I", netInterface, ip,
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -44,7 +42,7 @@ func doPing(ip string) bool {
 	cmdArgs := []string{
 		"-n", "-q", "-c", "3", ip,
 	}
-	_, err := doCmd(cmdName, cmdArgs)
+	_, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		return false
 	}
@@ -55,7 +53,7 @@ func doPing(ip string) bool {
 func doIpAddrCheck(ip string, netInterface string) bool {
 	cmdName := "ip"
 	cmdArgs := []string{"-o", "-4", "addr", "show", "dev", netInterface}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -70,7 +68,7 @@ func doIpAddrAdd(ip string, netInterface string) bool {
 	cmdName := "ip"
 	cmdArgs := []string{"-o", "addr", "add", ip + "/32", "dev", netInterface}
 	log.Debug(fmt.Sprintf("%v %v", cmdName, cmdArgs))
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -82,7 +80,7 @@ func doIpAddrDelete(ip string, netInterface string) bool {
 	cmdName := "ip"
 	cmdArgs := []string{"-o", "addr", "delete", ip + "/32", "dev", netInterface}
 	log.Debug(fmt.Sprintf("%v %v", cmdName, cmdArgs))
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -114,7 +112,7 @@ func initIptablesChain(name string) {
 		"-t", "nat",
 		"-L", name,
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		message = out.String()
 		if !strings.Contains(message, acl.IptablesNotFound) {
@@ -125,7 +123,7 @@ func initIptablesChain(name string) {
 			"-t", "nat",
 			"-N", name,
 		}
-		out, err = doCmd(cmdName, cmdArgs)
+		out, err = util.DoCmd(cmdName, cmdArgs)
 		if err != nil {
 			message = out.String()
 			if !strings.Contains(message, acl.IptablesChainFound) {
@@ -139,7 +137,7 @@ func initIptablesChain(name string) {
 		"-C", filterName,
 		"-j", name,
 	}
-	out, err = doCmd(cmdName, cmdArgs)
+	out, err = util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		message := out.String()
 		if !strings.Contains(message, acl.IptablesNotFound) {
@@ -151,7 +149,7 @@ func initIptablesChain(name string) {
 			"-A", filterName,
 			"-j", name,
 		}
-		doCmd(cmdName, cmdArgs)
+		util.DoCmd(cmdName, cmdArgs)
 	}
 }
 
@@ -168,7 +166,7 @@ func doIptablesCheck(ip string, port string, containerIp string, containerPort s
 		"-m", "comment",
 		"--comment", comment, // AppName.ProcName
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err == nil {
 		return true
 	}
@@ -186,7 +184,7 @@ func doIptablesClean(cmd string) bool {
 	cmd = strings.Replace(cmd, "\"", "", -1)
 	cmdArgs := strings.Split(cmd, " ")
 	cmdArgs = append([]string{"-t", "nat", "-D"}, cmdArgs[1:]...)
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -243,6 +241,7 @@ func isInIptables(ip string) bool {
 }
 
 func doIptablesAdd(ip string, port string, containerIp string, containerPort string, proto string, comment string) bool {
+
 	cmdName := "iptables"
 	cmdArgs := []string{
 		"-t", "nat",
@@ -255,7 +254,7 @@ func doIptablesAdd(ip string, port string, containerIp string, containerPort str
 		"-m", "comment",
 		"--comment", comment, // AppName.ProcName
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -276,7 +275,7 @@ func doIptablesDelete(ip string, port string, containerIp string, containerPort 
 		"-m", "comment",
 		"--comment", comment, // AppName.ProcName
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -328,7 +327,7 @@ func doIptablesCheckAcl(item *ItemAcl) bool {
 	var message string
 	var err error
 	for i := 1; i <= 3; i++ {
-		out, err := doCmd(cmdName, cmdArgs)
+		out, err := util.DoCmd(cmdName, cmdArgs)
 		if err == nil {
 			return true
 		}
@@ -367,7 +366,7 @@ func doIptablesAcl(item *ItemAcl) bool {
 	if item.device != "" {
 		cmdArgs = append(cmdArgs, []string{"-o", item.device}...)
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -382,7 +381,7 @@ func doIptablesList(chain string) (l []string, err error) {
 		"-S", chain,
 	}
 	var lines []string
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +399,7 @@ func doCalicoAddProfile(name string) bool {
 	// calicoctl profile add NAME
 	cmdName := "calicoctl"
 	cmdArgs := []string{"profile", "add", name}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err != nil {
 		log.Error(out.String())
 		log.Fatal(err)
@@ -417,7 +416,7 @@ func doCalicoAddProfileRule(name string, proto string, port string) bool {
 		"add", "inbound", "--at=1",
 		"allow", proto, "to", "ports", port,
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err == nil {
 		// added or existed
 		return true
@@ -438,7 +437,7 @@ func doCalicoAddProfileDefaultRule(name string) bool {
 		"add", "inbound", "--at=1",
 		"allow", "from", "tag", "default",
 	}
-	out, err := doCmd(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err == nil {
 		// added or existed
 		return true
@@ -454,25 +453,3 @@ func doCalicoAddProfileDefaultRule(name string) bool {
 //TODO(xutao) doCalicoDeleteProfile
 //TODO(xutao) doCalicoDeleteProfileRule
 //TODO(xutao) doCalicoDeleteProfileDefaultRule
-
-func doCmd(cmdName string, cmdArgs []string) (bytes.Buffer, error) {
-	var cmdOut bytes.Buffer
-	var cmdErr bytes.Buffer
-	cmd := exec.Command(cmdName, cmdArgs...)
-	cmd.Stdout = &cmdOut
-	cmd.Stderr = &cmdErr
-	err := cmd.Run()
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"cmd":  cmdName,
-			"args": cmdArgs,
-			"err":  err,
-		}).Debug("Fail to run cmd")
-		return cmdErr, err
-	}
-	log.WithFields(logrus.Fields{
-		"cmd":  cmdName,
-		"args": cmdArgs,
-	}).Debug("Success to run cmd")
-	return cmdOut, err
-}

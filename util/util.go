@@ -4,16 +4,53 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"sync"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	lainlet "github.com/laincloud/lainlet/client"
-	"os/exec"
-	"time"
 )
+
+var iptablesLock sync.Mutex
 
 type watcherCallback func(data interface{})
 
+var log = logrus.New()
+
+func DoCmd(cmdName string, cmdArgs []string) (bytes.Buffer, error) {
+	if cmdName == "iptables" {
+		iptablesLock.Lock()
+		defer iptablesLock.Unlock()
+	}
+	var cmdOut bytes.Buffer
+	var cmdErr bytes.Buffer
+	cmd := exec.Command(cmdName, cmdArgs...)
+	cmd.Stdout = &cmdOut
+	cmd.Stderr = &cmdErr
+	err := cmd.Run()
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"cmd":  cmdName,
+			"args": cmdArgs,
+			"err":  err,
+		}).Debug("Fail to run cmd")
+		return cmdErr, err
+	}
+	log.WithFields(logrus.Fields{
+		"cmd":  cmdName,
+		"args": cmdArgs,
+	}).Debug("Success to run cmd")
+	return cmdOut, err
+}
+
 func ExecCommand(name string, arg ...string) (string, error) {
+	if name == "iptables" {
+		iptablesLock.Lock()
+		defer iptablesLock.Unlock()
+	}
+
 	cmd := exec.Command(name, arg...)
 	var cmdOut bytes.Buffer
 	cmd.Stdout = &cmdOut
