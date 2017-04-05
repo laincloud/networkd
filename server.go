@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	etcd "github.com/coreos/etcd/client"
@@ -15,11 +21,6 @@ import (
 	lainlet "github.com/laincloud/lainlet/client"
 	"github.com/laincloud/networkd/acl"
 	"github.com/laincloud/networkd/dnsmasq"
-	"net"
-	"os"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -122,6 +123,9 @@ const EtcdNetworkdLeaderKey = "/lain/networkd/leader"
 const EtcdAppNetworkdKey = "/lain/networkd/apps"
 const EtcdSwarmKey = "/lain/swarm/docker/swarm/leader"
 const EtcdDeploydKey = "/lain/deployd/leader"
+
+// eg: /lain/networkd/containers/webrouter/worker/1 has the vip list for webrouter instance 1
+const EtcdNetworkdContainerVips = "/lain/networkd/containers"
 
 func init() {
 	kvetcd.Register()
@@ -1004,7 +1008,7 @@ func (self *Server) StopElect() {
 	}
 }
 
-func (self *Server) LockVirtualIp(ip string) (state int, err error) {
+func (self *Server) LockVirtualIp(ip string, containerName string) (state int, err error) {
 	// TODO(xutao) remove log.Fatal?
 	key := fmt.Sprintf("%s/%s.lock", EtcdNetworkdVirtualIpKey, ip)
 	value := self.hostname
@@ -1019,26 +1023,37 @@ func (self *Server) LockVirtualIp(ip string) (state int, err error) {
 			&etcd.SetOptions{PrevExist: etcd.PrevNoExist, TTL: 30 * time.Second},
 		)
 
+		self.CreateContainerVipKey(containerName, ip)
+
 		if err != nil {
 			if etcdErr, ok := err.(etcd.Error); ok {
 				switch etcdErr.Code {
 				case etcd.ErrorCodeNodeExist:
 					lockOwner := self.GetLockedVipHostname(ip)
 					if lockOwner != "" && lockOwner == self.hostname {
+						timeInterval := VipLockTTL
+						if !self.isContainerVipBalanced(containerName) {
+							timeInterval = 1
+							log.Info("find unbalanced vip of container")
+						} else {
+							log.Info("vip is balanced")
+						}
 						// refresh ttl
 						if _, e := kapi.Set(
 							context.Background(),
 							key,
 							value,
-							&etcd.SetOptions{PrevExist: etcd.PrevExist, TTL: 30 * time.Second},
+							&etcd.SetOptions{PrevExist: etcd.PrevExist, TTL: time.Duration(timeInterval) * time.Second},
 						); e != nil {
 							log.WithFields(logrus.Fields{
 								"err": e,
 								"key": key,
 							}).Error("fresh leader key ttl Failed")
 						}
+						self.AddContainerVip(containerName, ip)
 						return LockerStateLocked, nil
 					}
+					self.DeleteContainerVip(containerName, ip)
 					return LockerStateUnlocked, nil
 				default:
 					// FIXME(xutao) "client: etcd cluster is unavailable or misconfigured"
@@ -1069,7 +1084,7 @@ func (self *Server) LockVirtualIp(ip string) (state int, err error) {
 			context.Background(),
 			key,
 			value,
-			&etcd.SetOptions{PrevIndex: PrevIndex},
+			&etcd.SetOptions{PrevIndex: PrevIndex, TTL: VipLockTTL * time.Second},
 		)
 		if err != nil {
 			if retryCounter >= 3 {
@@ -1085,6 +1100,7 @@ func (self *Server) LockVirtualIp(ip string) (state int, err error) {
 			continue
 		}
 
+		self.AddContainerVip(containerName, ip)
 		log.WithFields(logrus.Fields{
 			"key":   key,
 			"value": value,
@@ -1143,7 +1159,7 @@ func (self *Server) GetLockedVipHostname(ip string) string {
 	}
 }
 
-func (self *Server) UnLockVirtualIp(ip string) (state int, err error) {
+func (self *Server) UnLockVirtualIp(ip string, containerName string) (state int, err error) {
 	// TODO(xutao) remove log.Fatal?
 	key := fmt.Sprintf("%s/%s.lock", EtcdNetworkdVirtualIpKey, ip)
 	value := self.hostname
@@ -1209,6 +1225,7 @@ func (self *Server) UnLockVirtualIp(ip string) (state int, err error) {
 			"key": key,
 		}).Fatal("Fail to delete key")
 	}
+	self.DeleteContainerVip(containerName, ip)
 
 	log.WithFields(logrus.Fields{
 		"key":   key,
