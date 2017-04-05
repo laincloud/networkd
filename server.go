@@ -1009,10 +1009,23 @@ func (self *Server) StopElect() {
 }
 
 func (self *Server) LockVirtualIp(ip string, containerName string) (state int, err error) {
+
+	self.CreateContainerVipKey(containerName, ip)
+
 	// TODO(xutao) remove log.Fatal?
 	key := fmt.Sprintf("%s/%s.lock", EtcdNetworkdVirtualIpKey, ip)
 	value := self.hostname
 	kapi := etcd.NewKeysAPI(*self.etcd)
+
+	added := 0
+	tmpOwner := self.GetLockedVipHostname(ip)
+	if tmpOwner != self.hostname {
+		added = 1
+	}
+	if !self.isContainerVipBalanced(containerName, added) {
+		self.DeleteContainerVip(containerName, ip)
+		return LockerStateUnlocked, nil
+	}
 
 	retryCounter := 0
 	for {
@@ -1023,8 +1036,6 @@ func (self *Server) LockVirtualIp(ip string, containerName string) (state int, e
 			&etcd.SetOptions{PrevExist: etcd.PrevNoExist, TTL: 30 * time.Second},
 		)
 
-		self.CreateContainerVipKey(containerName, ip)
-
 		if err != nil {
 			if etcdErr, ok := err.(etcd.Error); ok {
 				switch etcdErr.Code {
@@ -1032,7 +1043,7 @@ func (self *Server) LockVirtualIp(ip string, containerName string) (state int, e
 					lockOwner := self.GetLockedVipHostname(ip)
 					if lockOwner != "" && lockOwner == self.hostname {
 						timeInterval := VipLockTTL
-						if !self.isContainerVipBalanced(containerName) {
+						if !self.isContainerVipBalanced(containerName, 0) {
 							timeInterval = 1
 							log.Info("find unbalanced vip of container")
 						} else {

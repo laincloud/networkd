@@ -18,7 +18,7 @@ func ProcVipsHealthy(appName string, procName string) bool {
 	return false
 }
 
-func (self *Server) isContainerVipBalanced(containerName string) bool {
+func (self *Server) isContainerVipBalanced(containerName string, added int) bool {
 	container, ok := self.cDb.Get(containerName)
 	if !ok {
 		log.WithFields(logrus.Fields{
@@ -36,12 +36,15 @@ func (self *Server) isContainerVipBalanced(containerName string) bool {
 			vipUsed := make([]int, len(resp.Node.Nodes))
 			minUsed := MAX
 			for i, containerVips := range resp.Node.Nodes {
+				if len(containerVips.Nodes) == 0 {
+					continue //TODO gc proc
+				}
 				vipUsed[i] = getTotalUsedVips(containerVips)
 				if vipUsed[i] < minUsed {
 					minUsed = vipUsed[i]
 				}
 			}
-			if vipUsed[container.instance-1] > minUsed+1 {
+			if vipUsed[container.instance-1]+added > minUsed+1 {
 				return false
 			}
 			return true
