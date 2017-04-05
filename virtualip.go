@@ -202,7 +202,7 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 
 	if item.port == "" {
 		// check locked ip hostname
-		state, err = self.LockVirtualIp(item.ip)
+		state, err = self.LockVirtualIp(item.ip, item.containerName)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"ip":  item.ip,
@@ -294,7 +294,7 @@ func (self *Server) UnApplyVirtualIp(item *VirtualIpItem) bool {
 		item.DeleteIp(self.iface)
 
 		// check locked ip hostname
-		state, err := self.UnLockVirtualIp(item.ip)
+		state, err := self.UnLockVirtualIp(item.ip, item.containerName)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"ip":  item.ip,
