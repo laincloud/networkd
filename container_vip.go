@@ -54,8 +54,6 @@ func (self *Server) isContainerVipBalanced(containerName string, added int) bool
 		}
 		time.Sleep(time.Second)
 	}
-
-	return false
 }
 
 func getTotalUsedVips(containerVips *etcd.Node) int {

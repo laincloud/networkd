@@ -89,6 +89,10 @@ type Server struct {
 	deploydFlag      bool
 	deploydStopCh    chan struct{}
 	deploydIsRunning bool
+	// streamrouter
+	streamrouterFlag      bool
+	streamrouterStopCh    chan struct{}
+	streamrouterIsRunning bool
 }
 
 type JSONVirtualIpPortConfig struct {
@@ -102,7 +106,6 @@ type JSONVirtualIpConfig struct {
 	Ports         []JSONVirtualIpPortConfig `json:"ports"`
 	ExcludedNodes []string                  `json:"excluded_nodes"`
 }
-type JSONVirtualIpConfigs map[string]JSONVirtualIpConfig
 
 type JSONLainletContainer struct {
 	AppName    string `json:"app"`
@@ -131,11 +134,12 @@ func init() {
 	kvetcd.Register()
 }
 
-func (self *Server) InitFlag(dnsmasq bool, tinydns bool, swarm bool, webrouter bool, deployd bool, acl bool, resolvConf bool) {
+func (self *Server) InitFlag(dnsmasq bool, tinydns bool, swarm bool, webrouter bool, deployd bool, acl bool, resolvConf bool, streamrouter bool) {
 	self.dnsmasqFlag = dnsmasq
 	self.tinydnsFlag = tinydns
 	self.swarmFlag = swarm
 	self.webrouterFlag = webrouter
+	self.streamrouterFlag = streamrouter
 	self.deploydFlag = deployd
 	self.aclFlag = acl
 	self.resolvConfFlag = resolvConf
@@ -289,6 +293,11 @@ func (self *Server) InitAcl() {
 func (self *Server) InitWebrouter() {
 	self.webrouterStopCh = make(chan struct{})
 	self.webrouterIsRunning = false
+}
+
+func (self *Server) InitStreamrouter() {
+	self.streamrouterStopCh = make(chan struct{})
+	self.streamrouterIsRunning = false
 }
 
 func (self *Server) InitDeployd() {
@@ -962,6 +971,9 @@ func (self *Server) WatchElect(stopWatchCh <-chan struct{}) {
 					if self.webrouterFlag {
 						self.RunWebrouter()
 					}
+					if self.streamrouterFlag {
+						self.RunStreamrouter()
+					}
 					if self.dnsmasqFlag {
 						if self.swarmFlag {
 							self.RunSwarm()
@@ -981,6 +993,9 @@ func (self *Server) WatchElect(stopWatchCh <-chan struct{}) {
 					}
 					if self.webrouterFlag {
 						self.StopWebrouter()
+					}
+					if self.streamrouterFlag {
+						self.StopStreamrouter()
 					}
 					if self.deploydFlag {
 						self.StopDeployd()
@@ -1459,6 +1474,9 @@ func (self *Server) Stop() {
 	}
 	if self.webrouterFlag {
 		self.StopWebrouter()
+	}
+	if self.streamrouterFlag {
+		self.StopStreamrouter()
 	}
 	if self.deploydFlag {
 		self.StopDeployd()

@@ -33,6 +33,7 @@ func main() {
 		tinydns         = flag.Bool("tinydns", false, "Enable/Disable watch tinydns ip.")
 		swarm           = flag.Bool("swarm", false, "Enable/Disable watch swarm ip.")
 		webrouter       = flag.Bool("webrouter", false, "Enable/Disable watch webrouter ip.")
+		streamrouter    = flag.Bool("streamrouter", false, "Enable/Disable watch streamrouter vips and ports.")
 		deployd         = flag.Bool("deployd", false, "Enable/Disable watch deployd ip.")
 		dnsmasq         = flag.Bool("dnsmasq", false, "Enable/Disable dnsmasq.")
 		acl             = flag.Bool("acl", false, "Enable/Disable acl.")
@@ -81,7 +82,7 @@ func main() {
 	defer lock.Unlock()
 
 	var server Server
-	server.InitFlag(*dnsmasq, *tinydns, *swarm, *webrouter, *deployd, *acl, *resolvConf)
+	server.InitFlag(*dnsmasq, *tinydns, *swarm, *webrouter, *deployd, *acl, *resolvConf, *streamrouter)
 	server.InitIptables()
 	server.InitLibNetwork(*libnetwork)
 	server.InitDocker(*dockerEndpoint)
@@ -92,6 +93,7 @@ func main() {
 	server.InitLibkv(*etcdEndpoint)
 	server.InitLainlet(*lainletEndPoint)
 	server.InitWebrouter()
+	server.InitStreamrouter()
 	server.InitDeployd()
 	server.InitResolvConf()
 	server.InitDomain(*domain)
