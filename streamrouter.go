@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
+	lainlet "github.com/laincloud/lainlet/client"
 )
 
 //type JSONVirtualIpConfigs map[string]JSONVirtualIpConfig
@@ -42,6 +41,19 @@ func (conf *StreamRouterConfig) getConfigValue() string {
 		return ""
 	}
 	return string(b)
+}
+
+func (conf *StreamRouterConfig) setConfigPorts(ports []int) {
+	conf.lock.Lock()
+	defer conf.lock.Unlock()
+	conf.c.Ports = []JSONVirtualIpPortConfig{}
+	for _, v := range ports {
+		strPort := fmt.Sprintf("%d", v)
+		conf.c.Ports = append(conf.c.Ports, JSONVirtualIpPortConfig{
+			Src:  strPort,
+			Dest: strPort,
+		})
+	}
 }
 
 func (self *Server) RunStreamrouter() {
@@ -83,71 +95,46 @@ func (self *Server) StopStreamrouter() {
 func (self *Server) WatchStreamRouter(conf *StreamRouterConfig, stopWatchCh <-chan struct{}) (<-chan int, <-chan int) {
 	vipEventCh := make(chan int)
 	portEventCh := make(chan int)
-	go func() { //watch vip from lainlet config watcher /lain/config/streamrouter/vippool
-		retryCounter := 0
-		for {
-			ctx := context.Background()
-			watchKey := fmt.Sprintf("/v2/configwatcher?target=%s&heartbeat=5", StreamrouterVippoolKey)
-			ch, err := self.lainlet.Watch(watchKey, ctx)
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"err":          err,
-					"retryCounter": retryCounter,
-				}).Error("Fail to Connect Lainlet")
-				if retryCounter > 3 {
-					time.Sleep(30 * time.Second)
-				} else {
-					time.Sleep(1 * time.Second)
-				}
-				retryCounter++
-				continue
-			}
-			retryCounter = 0
-			for event := range ch {
-				if event.Id == 0 {
-					// lainlet error for etcd down
-					if event.Event == "error" {
-						log.WithFields(logrus.Fields{
-							"id":    event.Id,
-							"event": event.Event,
-						}).Error("Fail to watch lainlet")
-						time.Sleep(5 * time.Second)
-					}
-					continue
-				}
-				if event.Event == "error" {
-					continue
-				}
-				var vipList interface{}
-				err = json.Unmarshal(event.Data, &vipList)
-				if err != nil {
-					log.Error(err)
-				}
-				if vStrList, ok := vipList.(map[string]interface{})[StreamrouterVippoolKey].(string); ok {
-					var vList []string
-					err = json.Unmarshal([]byte(vStrList), &vList)
-					if err != nil {
-						log.Error(err)
-					}
-					conf.lock.Lock()
-					deletedVips := getDeletedVips(conf.vips, vList)
-					for _, dvip := range deletedVips {
-						self.DeleteLainVip(dvip)
-					}
-					conf.vips = vList
-					//TODO check ip validity
-					conf.lock.Unlock()
-					vipEventCh <- 1
-				} else {
-					log.Debug(vipList.(map[string]interface{})[StreamrouterVippoolKey])
-				}
-			}
-			log.Error("Fail to watch lainlet")
+	watchKey := fmt.Sprintf("/v2/configwatcher?target=%s&heartbeat=5", StreamrouterVippoolKey)
+	go self.WatchLainlet(watchKey, func(event *lainlet.Response) { //watch vip from lainlet config watcher /lain/config/streamrouter/vippool
+		if event.Event == "error" {
+			return
 		}
-	}()
-	go func() { //watch port from lainlet streamrouter watcher
-
-	}()
+		var vipList interface{}
+		err := json.Unmarshal(event.Data, &vipList)
+		if err != nil {
+			log.Error(err)
+		}
+		if vStrList, ok := vipList.(map[string]interface{})[StreamrouterVippoolKey].(string); ok {
+			var vList []string
+			err = json.Unmarshal([]byte(vStrList), &vList)
+			if err != nil {
+				log.Error(err)
+			}
+			conf.lock.Lock()
+			deletedVips := getDeletedVips(conf.vips, vList)
+			for _, dvip := range deletedVips {
+				self.DeleteLainVip(dvip)
+			}
+			conf.vips = vList
+			//TODO check ip validity
+			conf.lock.Unlock()
+			vipEventCh <- 1
+		} else {
+			log.Debug(vipList.(map[string]interface{})[StreamrouterVippoolKey])
+		}
+	})
+	go self.WatchLainlet("/v2/streamrouter/ports", func(event *lainlet.Response) { //watch port from lainlet streamrouter watcher
+		log.Debug("stream", event)
+		if event.Event == "error" {
+			return
+		}
+		var ports []int
+		json.Unmarshal(event.Data, &ports)
+		log.Debug("stream:", ports)
+		conf.setConfigPorts(ports)
+		portEventCh <- 1
+	})
 	return vipEventCh, portEventCh
 }
 

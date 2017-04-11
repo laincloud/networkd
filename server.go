@@ -391,18 +391,16 @@ func (self *Server) WatchNetworkdVirtualIps() {
 
 }
 
-func (self *Server) WatchLainletVirtualIps() {
-	keyPrefixLength := len(LainLetVirtualIpKey) + 1
+func (self *Server) WatchLainlet(watchKey string, callback func(event *lainlet.Response)) {
 	retryCounter := 0
 	for {
-		//ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
 		ctx := context.Background()
-		ch, err := self.lainlet.Watch("/v2/configwatcher?target=vips&heartbeat=5", ctx)
+		ch, err := self.lainlet.Watch(watchKey, ctx)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"err":          err,
 				"retryCounter": retryCounter,
-			}).Error("Fail to connect lainlet")
+			}).Error("Fail to Connect Lainlet")
 			if retryCounter > 3 {
 				time.Sleep(30 * time.Second)
 			} else {
@@ -424,63 +422,72 @@ func (self *Server) WatchLainletVirtualIps() {
 				}
 				continue
 			}
-			currentUnixTime := time.Now().Unix()
-			var vips interface{}
-			err = json.Unmarshal(event.Data, &vips)
-			for key, value := range vips.(map[string]interface{}) {
-				virtualIpKey := key[keyPrefixLength:]
-				virtualPort := ""
-				colonCount := strings.Count(virtualIpKey, ":")
-				if colonCount == 1 {
-					splitKey := strings.SplitN(virtualIpKey, ":", 2)
-					virtualIpKey, virtualPort = splitKey[0], splitKey[1]
-				} else if colonCount > 1 {
-					log.WithFields(logrus.Fields{
-						"virtualIpKey": virtualIpKey,
-						"value":        value.(string),
-					}).Error("Invalid key")
-					continue
-				}
-				paresedIp := net.ParseIP(virtualIpKey)
-				if paresedIp.To4() == nil {
-					log.WithFields(logrus.Fields{
-						"virtualIpKey": virtualIpKey,
-						"value":        value.(string),
-					}).Error("Invalid key")
-					continue
-				}
-				log.WithFields(logrus.Fields{
-					"virtualIpKey": virtualIpKey,
-					"value":        value.(string),
-				}).Debug("Get virutal ip config from lainlet")
-				var ipConfig JSONVirtualIpConfig
-				err = json.Unmarshal([]byte(value.(string)), &ipConfig)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"key":    fmt.Sprintf("/lain/config/%s", key),
-						"reason": err,
-					}).Warn("Cannot parse virtual ip config")
-					continue
-				}
-				log.WithFields(logrus.Fields{
-					"virtualIpKey": virtualIpKey,
-					"ipConfig":     ipConfig,
-				}).Debug("Get virutal ip json config from lainlet")
-				if virtualPort != "" {
-					// TODO(xutao) check ports in config
-				}
-				if virtualIpKey == "0.0.0.0" {
-					// replace 0.0.0.0 as host ip
-					virtualIpKey = self.ip
-				}
-				self.AddVirtualIp(virtualIpKey, virtualPort, ipConfig, currentUnixTime)
-			}
-			self.vDb.SetUpdatedUnixTime(currentUnixTime)
-			log.Debug("Send virtual ip event")
-			self.eventCh <- 1
+
+			callback(event)
 		}
 		log.Error("Fail to watch lainlet")
 	}
+
+}
+
+func (self *Server) WatchLainletVirtualIps() {
+	self.WatchLainlet("/v2/configwatcher?target=vips&heartbeat=5", func(event *lainlet.Response) {
+		keyPrefixLength := len(LainLetVirtualIpKey) + 1
+		currentUnixTime := time.Now().Unix()
+		var vips interface{}
+		err := json.Unmarshal(event.Data, &vips)
+		for key, value := range vips.(map[string]interface{}) {
+			virtualIpKey := key[keyPrefixLength:]
+			virtualPort := ""
+			colonCount := strings.Count(virtualIpKey, ":")
+			if colonCount == 1 {
+				splitKey := strings.SplitN(virtualIpKey, ":", 2)
+				virtualIpKey, virtualPort = splitKey[0], splitKey[1]
+			} else if colonCount > 1 {
+				log.WithFields(logrus.Fields{
+					"virtualIpKey": virtualIpKey,
+					"value":        value.(string),
+				}).Error("Invalid key")
+				return
+			}
+			paresedIp := net.ParseIP(virtualIpKey)
+			if paresedIp.To4() == nil {
+				log.WithFields(logrus.Fields{
+					"virtualIpKey": virtualIpKey,
+					"value":        value.(string),
+				}).Error("Invalid key")
+				return
+			}
+			log.WithFields(logrus.Fields{
+				"virtualIpKey": virtualIpKey,
+				"value":        value.(string),
+			}).Debug("Get virutal ip config from lainlet")
+			var ipConfig JSONVirtualIpConfig
+			err = json.Unmarshal([]byte(value.(string)), &ipConfig)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"key":    fmt.Sprintf("/lain/config/%s", key),
+					"reason": err,
+				}).Warn("Cannot parse virtual ip config")
+				return
+			}
+			log.WithFields(logrus.Fields{
+				"virtualIpKey": virtualIpKey,
+				"ipConfig":     ipConfig,
+			}).Debug("Get virutal ip json config from lainlet")
+			if virtualPort != "" {
+				// TODO(xutao) check ports in config
+			}
+			if virtualIpKey == "0.0.0.0" {
+				// replace 0.0.0.0 as host ip
+				virtualIpKey = self.ip
+			}
+			self.AddVirtualIp(virtualIpKey, virtualPort, ipConfig, currentUnixTime)
+		}
+		self.vDb.SetUpdatedUnixTime(currentUnixTime)
+		log.Debug("Send virtual ip event")
+		self.eventCh <- 1
+	})
 }
 
 func (self *Server) WatchProcIps(stopWatchCh <-chan struct{}, app string, proc string) <-chan int {
