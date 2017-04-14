@@ -19,7 +19,10 @@ func (self *Server) RunTinydns() {
 	eventCh := self.WatchTinydnsIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("tinydns done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {

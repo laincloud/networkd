@@ -67,7 +67,10 @@ func (self *Server) RunStreamrouter() {
 	vipEventCh, portEventCh := self.WatchStreamRouter(conf, stopCh) // vips and ports
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("streamRouter Done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -96,7 +99,16 @@ func (self *Server) WatchStreamRouter(conf *StreamRouterConfig, stopWatchCh <-ch
 	vipEventCh := make(chan int)
 	portEventCh := make(chan int)
 	watchKey := fmt.Sprintf("/v2/configwatcher?target=%s&heartbeat=5", StreamrouterVippoolKey)
-	go self.WatchLainlet(watchKey, func(event *lainlet.Response) { //watch vip from lainlet config watcher /lain/config/streamrouter/vippool
+	stopVip := make(chan struct{})
+	stopPorts := make(chan struct{})
+	go func() {
+		select {
+		case <-stopWatchCh:
+			stopVip <- struct{}{}
+			stopPorts <- struct{}{}
+		}
+	}()
+	go self.WatchLainlet(watchKey, stopVip, func(event *lainlet.Response) { //watch vip from lainlet config watcher /lain/config/streamrouter/vippool
 		if event.Event == "error" {
 			return
 		}
@@ -124,7 +136,7 @@ func (self *Server) WatchStreamRouter(conf *StreamRouterConfig, stopWatchCh <-ch
 			log.Debug(vipList.(map[string]interface{})[StreamrouterVippoolKey])
 		}
 	})
-	go self.WatchLainlet("/v2/streamrouter/ports", func(event *lainlet.Response) { //watch port from lainlet streamrouter watcher
+	go self.WatchLainlet("/v2/streamrouter/ports", stopPorts, func(event *lainlet.Response) { //watch port from lainlet streamrouter watcher
 		log.Debug("stream", event)
 		if event.Event == "error" {
 			return

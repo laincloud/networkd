@@ -391,7 +391,7 @@ func (self *Server) WatchNetworkdVirtualIps() {
 
 }
 
-func (self *Server) WatchLainlet(watchKey string, callback func(event *lainlet.Response)) {
+func (self *Server) WatchLainlet(watchKey string, stopCh <-chan struct{}, callback func(event *lainlet.Response)) {
 	retryCounter := 0
 	for {
 		ctx := context.Background()
@@ -410,20 +410,25 @@ func (self *Server) WatchLainlet(watchKey string, callback func(event *lainlet.R
 			continue
 		}
 		retryCounter = 0
-		for event := range ch {
-			if event.Id == 0 {
-				// lainlet error for etcd down
-				if event.Event == "error" {
-					log.WithFields(logrus.Fields{
-						"id":    event.Id,
-						"event": event.Event,
-					}).Error("Fail to watch lainlet")
-					time.Sleep(5 * time.Second)
-				}
-				continue
-			}
 
-			callback(event)
+		for {
+			select {
+			case event := <-ch:
+				if event.Id == 0 {
+					// lainlet error for etcd down
+					if event.Event == "error" {
+						log.WithFields(logrus.Fields{
+							"id":    event.Id,
+							"event": event.Event,
+						}).Error("Fail to watch lainlet")
+						time.Sleep(5 * time.Second)
+					}
+					continue
+				}
+				callback(event)
+			case <-stopCh:
+				return
+			}
 		}
 		log.Error("Fail to watch lainlet")
 	}
@@ -431,7 +436,7 @@ func (self *Server) WatchLainlet(watchKey string, callback func(event *lainlet.R
 }
 
 func (self *Server) WatchLainletVirtualIps() {
-	self.WatchLainlet("/v2/configwatcher?target=vips&heartbeat=5", func(event *lainlet.Response) {
+	self.WatchLainlet("/v2/configwatcher?target=vips&heartbeat=5", nil, func(event *lainlet.Response) {
 		keyPrefixLength := len(LainLetVirtualIpKey) + 1
 		currentUnixTime := time.Now().Unix()
 		var vips interface{}
@@ -754,7 +759,10 @@ func (self *Server) RunHealth() {
 	self.healthIsRunning = true
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("health done")
+			self.wg.Done()
+		}()
 		tickCh := time.NewTicker(time.Second * 30).C
 		for {
 			select {
@@ -1323,7 +1331,10 @@ func (self *Server) RunWebrouter() {
 	eventCh := self.WatchWebrouterIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("webrouter done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -1355,7 +1366,10 @@ func (self *Server) RunSwarm() {
 	eventCh := self.WatchSwarmIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("swarm done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -1387,7 +1401,10 @@ func (self *Server) RunDeployd() {
 	eventCh := self.WatchDeploydIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("deployd done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -1410,7 +1427,7 @@ func (self *Server) StopDeployd() {
 }
 
 func (self *Server) RunLainlet() {
-	log.Info("Run")
+	log.Info("Run lainlet begin")
 	self.InitVirtualIpDb()
 	self.InitContainerDb()
 	tickCh := time.NewTicker(time.Second * 5).C
@@ -1419,7 +1436,10 @@ func (self *Server) RunLainlet() {
 	go self.WatchLainletVirtualIps()
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("lainlet done")
+			self.wg.Done()
+		}()
 		for {
 			select {
 			case <-self.eventCh:
