@@ -89,6 +89,10 @@ type Server struct {
 	deploydFlag      bool
 	deploydStopCh    chan struct{}
 	deploydIsRunning bool
+	// streamrouter
+	streamrouterFlag      bool
+	streamrouterStopCh    chan struct{}
+	streamrouterIsRunning bool
 }
 
 type JSONVirtualIpPortConfig struct {
@@ -102,7 +106,6 @@ type JSONVirtualIpConfig struct {
 	Ports         []JSONVirtualIpPortConfig `json:"ports"`
 	ExcludedNodes []string                  `json:"excluded_nodes"`
 }
-type JSONVirtualIpConfigs map[string]JSONVirtualIpConfig
 
 type JSONLainletContainer struct {
 	AppName    string `json:"app"`
@@ -131,11 +134,12 @@ func init() {
 	kvetcd.Register()
 }
 
-func (self *Server) InitFlag(dnsmasq bool, tinydns bool, swarm bool, webrouter bool, deployd bool, acl bool, resolvConf bool) {
+func (self *Server) InitFlag(dnsmasq bool, tinydns bool, swarm bool, webrouter bool, deployd bool, acl bool, resolvConf bool, streamrouter bool) {
 	self.dnsmasqFlag = dnsmasq
 	self.tinydnsFlag = tinydns
 	self.swarmFlag = swarm
 	self.webrouterFlag = webrouter
+	self.streamrouterFlag = streamrouter
 	self.deploydFlag = deployd
 	self.aclFlag = acl
 	self.resolvConfFlag = resolvConf
@@ -291,6 +295,11 @@ func (self *Server) InitWebrouter() {
 	self.webrouterIsRunning = false
 }
 
+func (self *Server) InitStreamrouter() {
+	self.streamrouterStopCh = make(chan struct{})
+	self.streamrouterIsRunning = false
+}
+
 func (self *Server) InitDeployd() {
 	self.deploydStopCh = make(chan struct{})
 	self.deploydIsRunning = false
@@ -382,18 +391,16 @@ func (self *Server) WatchNetworkdVirtualIps() {
 
 }
 
-func (self *Server) WatchLainletVirtualIps() {
-	keyPrefixLength := len(LainLetVirtualIpKey) + 1
+func (self *Server) WatchLainlet(watchKey string, stopCh <-chan struct{}, callback func(event *lainlet.Response)) {
 	retryCounter := 0
 	for {
-		//ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
 		ctx := context.Background()
-		ch, err := self.lainlet.Watch("/v2/configwatcher?target=vips&heartbeat=5", ctx)
+		ch, err := self.lainlet.Watch(watchKey, ctx)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"err":          err,
 				"retryCounter": retryCounter,
-			}).Error("Fail to connect lainlet")
+			}).Error("Fail to Connect Lainlet")
 			if retryCounter > 3 {
 				time.Sleep(30 * time.Second)
 			} else {
@@ -403,75 +410,89 @@ func (self *Server) WatchLainletVirtualIps() {
 			continue
 		}
 		retryCounter = 0
-		for event := range ch {
-			if event.Id == 0 {
-				// lainlet error for etcd down
-				if event.Event == "error" {
-					log.WithFields(logrus.Fields{
-						"id":    event.Id,
-						"event": event.Event,
-					}).Error("Fail to watch lainlet")
-					time.Sleep(5 * time.Second)
+
+		for {
+			select {
+			case event := <-ch:
+				if event.Id == 0 {
+					// lainlet error for etcd down
+					if event.Event == "error" {
+						log.WithFields(logrus.Fields{
+							"id":    event.Id,
+							"event": event.Event,
+						}).Error("Fail to watch lainlet")
+						time.Sleep(5 * time.Second)
+					}
+					continue
 				}
-				continue
+				callback(event)
+			case <-stopCh:
+				return
 			}
-			currentUnixTime := time.Now().Unix()
-			var vips interface{}
-			err = json.Unmarshal(event.Data, &vips)
-			for key, value := range vips.(map[string]interface{}) {
-				virtualIpKey := key[keyPrefixLength:]
-				virtualPort := ""
-				colonCount := strings.Count(virtualIpKey, ":")
-				if colonCount == 1 {
-					splitKey := strings.SplitN(virtualIpKey, ":", 2)
-					virtualIpKey, virtualPort = splitKey[0], splitKey[1]
-				} else if colonCount > 1 {
-					log.WithFields(logrus.Fields{
-						"virtualIpKey": virtualIpKey,
-						"value":        value.(string),
-					}).Error("Invalid key")
-					continue
-				}
-				paresedIp := net.ParseIP(virtualIpKey)
-				if paresedIp.To4() == nil {
-					log.WithFields(logrus.Fields{
-						"virtualIpKey": virtualIpKey,
-						"value":        value.(string),
-					}).Error("Invalid key")
-					continue
-				}
-				log.WithFields(logrus.Fields{
-					"virtualIpKey": virtualIpKey,
-					"value":        value.(string),
-				}).Debug("Get virutal ip config from lainlet")
-				var ipConfig JSONVirtualIpConfig
-				err = json.Unmarshal([]byte(value.(string)), &ipConfig)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"key":    fmt.Sprintf("/lain/config/%s", key),
-						"reason": err,
-					}).Warn("Cannot parse virtual ip config")
-					continue
-				}
-				log.WithFields(logrus.Fields{
-					"virtualIpKey": virtualIpKey,
-					"ipConfig":     ipConfig,
-				}).Debug("Get virutal ip json config from lainlet")
-				if virtualPort != "" {
-					// TODO(xutao) check ports in config
-				}
-				if virtualIpKey == "0.0.0.0" {
-					// replace 0.0.0.0 as host ip
-					virtualIpKey = self.ip
-				}
-				self.AddVirtualIp(virtualIpKey, virtualPort, ipConfig, currentUnixTime)
-			}
-			self.vDb.SetUpdatedUnixTime(currentUnixTime)
-			log.Debug("Send virtual ip event")
-			self.eventCh <- 1
 		}
 		log.Error("Fail to watch lainlet")
 	}
+
+}
+
+func (self *Server) WatchLainletVirtualIps() {
+	self.WatchLainlet("/v2/configwatcher?target=vips&heartbeat=5", nil, func(event *lainlet.Response) {
+		keyPrefixLength := len(LainLetVirtualIpKey) + 1
+		currentUnixTime := time.Now().Unix()
+		var vips interface{}
+		err := json.Unmarshal(event.Data, &vips)
+		for key, value := range vips.(map[string]interface{}) {
+			virtualIpKey := key[keyPrefixLength:]
+			virtualPort := ""
+			colonCount := strings.Count(virtualIpKey, ":")
+			if colonCount == 1 {
+				splitKey := strings.SplitN(virtualIpKey, ":", 2)
+				virtualIpKey, virtualPort = splitKey[0], splitKey[1]
+			} else if colonCount > 1 {
+				log.WithFields(logrus.Fields{
+					"virtualIpKey": virtualIpKey,
+					"value":        value.(string),
+				}).Error("Invalid key")
+				return
+			}
+			paresedIp := net.ParseIP(virtualIpKey)
+			if paresedIp.To4() == nil {
+				log.WithFields(logrus.Fields{
+					"virtualIpKey": virtualIpKey,
+					"value":        value.(string),
+				}).Error("Invalid key")
+				return
+			}
+			log.WithFields(logrus.Fields{
+				"virtualIpKey": virtualIpKey,
+				"value":        value.(string),
+			}).Debug("Get virutal ip config from lainlet")
+			var ipConfig JSONVirtualIpConfig
+			err = json.Unmarshal([]byte(value.(string)), &ipConfig)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"key":    fmt.Sprintf("/lain/config/%s", key),
+					"reason": err,
+				}).Warn("Cannot parse virtual ip config")
+				return
+			}
+			log.WithFields(logrus.Fields{
+				"virtualIpKey": virtualIpKey,
+				"ipConfig":     ipConfig,
+			}).Debug("Get virutal ip json config from lainlet")
+			if virtualPort != "" {
+				// TODO(xutao) check ports in config
+			}
+			if virtualIpKey == "0.0.0.0" {
+				// replace 0.0.0.0 as host ip
+				virtualIpKey = self.ip
+			}
+			self.AddVirtualIp(virtualIpKey, virtualPort, ipConfig, currentUnixTime)
+		}
+		self.vDb.SetUpdatedUnixTime(currentUnixTime)
+		log.Debug("Send virtual ip event")
+		self.eventCh <- 1
+	})
 }
 
 func (self *Server) WatchProcIps(stopWatchCh <-chan struct{}, app string, proc string) <-chan int {
@@ -738,7 +759,10 @@ func (self *Server) RunHealth() {
 	self.healthIsRunning = true
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("health done")
+			self.wg.Done()
+		}()
 		tickCh := time.NewTicker(time.Second * 30).C
 		for {
 			select {
@@ -962,6 +986,9 @@ func (self *Server) WatchElect(stopWatchCh <-chan struct{}) {
 					if self.webrouterFlag {
 						self.RunWebrouter()
 					}
+					if self.streamrouterFlag {
+						self.RunStreamrouter()
+					}
 					if self.dnsmasqFlag {
 						if self.swarmFlag {
 							self.RunSwarm()
@@ -981,6 +1008,9 @@ func (self *Server) WatchElect(stopWatchCh <-chan struct{}) {
 					}
 					if self.webrouterFlag {
 						self.StopWebrouter()
+					}
+					if self.streamrouterFlag {
+						self.StopStreamrouter()
 					}
 					if self.deploydFlag {
 						self.StopDeployd()
@@ -1301,7 +1331,10 @@ func (self *Server) RunWebrouter() {
 	eventCh := self.WatchWebrouterIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("webrouter done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -1333,7 +1366,10 @@ func (self *Server) RunSwarm() {
 	eventCh := self.WatchSwarmIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("swarm done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -1365,7 +1401,10 @@ func (self *Server) RunDeployd() {
 	eventCh := self.WatchDeploydIps(stopCh)
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("deployd done")
+			self.wg.Done()
+		}()
 		defer close(stopCh)
 		for {
 			select {
@@ -1388,7 +1427,7 @@ func (self *Server) StopDeployd() {
 }
 
 func (self *Server) RunLainlet() {
-	log.Info("Run")
+	log.Info("Run lainlet begin")
 	self.InitVirtualIpDb()
 	self.InitContainerDb()
 	tickCh := time.NewTicker(time.Second * 5).C
@@ -1397,7 +1436,10 @@ func (self *Server) RunLainlet() {
 	go self.WatchLainletVirtualIps()
 	go func() {
 		self.wg.Add(1)
-		defer self.wg.Done()
+		defer func() {
+			log.Info("lainlet done")
+			self.wg.Done()
+		}()
 		for {
 			select {
 			case <-self.eventCh:
@@ -1459,6 +1501,9 @@ func (self *Server) Stop() {
 	}
 	if self.webrouterFlag {
 		self.StopWebrouter()
+	}
+	if self.streamrouterFlag {
+		self.StopStreamrouter()
 	}
 	if self.deploydFlag {
 		self.StopDeployd()

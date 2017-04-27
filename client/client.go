@@ -14,7 +14,8 @@ type JSONVirtualIpPortConfig struct {
 	ProcType string `json:"proctype"`
 }
 type JSONVirtualIpPortConfigs map[string]JSONVirtualIpPortConfig
-type JSONVirtualIpConfigs map[string]JSONVirtualIpPortConfigs
+
+//type JSONVirtualIpConfigs map[string]JSONVirtualIpPortConfigs
 
 const Version = "0.0.2"
 const LainLetVirtualIpKey = "vips"
