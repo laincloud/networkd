@@ -834,7 +834,7 @@ func (self *Server) GetAppKey(item *VirtualIpItem) string {
 						"err":         err,
 						"etcdErrCode": etcdErr.Code,
 						"key":         key,
-					}).Fatal("Fail to get key")
+					}).Error("Fail to get key")
 				}
 			}
 
@@ -1077,7 +1077,7 @@ func (self *Server) LockVirtualIp(ip string, containerName string) (state int, e
 							timeInterval = 1
 							log.Info("find unbalanced vip of container")
 						} else {
-							log.Info("vip is balanced")
+							log.Debug("vip is balanced")
 						}
 						// refresh ttl
 						if _, e := kapi.Set(

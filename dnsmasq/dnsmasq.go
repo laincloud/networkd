@@ -118,6 +118,7 @@ func (self *Server) StopDnsmasqd() {
 }
 
 func (self *Server) RestartDnsmasq() {
+	self.log.Info("systemctl restart dnsmasq")
 	_, err := util.ExecCommand("systemctl", "restart", "dnsmasq")
 	if err != nil {
 		self.log.WithFields(logrus.Fields{
