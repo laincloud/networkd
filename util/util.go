@@ -23,6 +23,7 @@ func DoCmd(cmdName string, cmdArgs []string) (bytes.Buffer, error) {
 	if cmdName == "iptables" {
 		iptablesLock.Lock()
 		defer iptablesLock.Unlock()
+		cmdArgs = append(cmdArgs, "--wait")
 	}
 	var cmdOut bytes.Buffer
 	var cmdErr bytes.Buffer
