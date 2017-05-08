@@ -410,10 +410,14 @@ func (self *Server) WatchLainlet(watchKey string, stopCh <-chan struct{}, callba
 			continue
 		}
 		retryCounter = 0
-
+		breakWatch := false
 		for {
 			select {
-			case event := <-ch:
+			case event, ok := <-ch:
+				if !ok {
+					breakWatch = true
+					break
+				}
 				if event.Id == 0 {
 					// lainlet error for etcd down
 					if event.Event == "error" {
@@ -428,6 +432,9 @@ func (self *Server) WatchLainlet(watchKey string, stopCh <-chan struct{}, callba
 				callback(event)
 			case <-stopCh:
 				return
+			}
+			if breakWatch {
+				break
 			}
 		}
 		log.Error("Fail to watch lainlet")

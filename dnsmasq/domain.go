@@ -3,6 +3,8 @@ package dnsmasq
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/laincloud/networkd/util"
 )
@@ -23,7 +25,7 @@ func (self *Server) WatchDnsmasqExtra(watchCh <-chan struct{}) {
 			err := json.Unmarshal([]byte(value.(string)), &domains)
 			if err != nil {
 				self.log.WithFields(logrus.Fields{
-					"key":    fmt.Sprintf("/lain/config/%s/%s", EtcdServerPrefixKey, key),
+					"key":    fmt.Sprintf("/lain/config/%s/%s", EtcdDnsExtraPrefixKey, key),
 					"reason": err,
 				}).Error("Cannot parse domain server config")
 				continue
@@ -35,6 +37,9 @@ func (self *Server) WatchDnsmasqExtra(watchCh <-chan struct{}) {
 				})
 			}
 		}
+		if reflect.DeepEqual(self.domains, domainAddrs) {
+			return
+		}
 		self.domains = domainAddrs
 		self.cnfEvCh <- 1
 	})
@@ -42,6 +47,7 @@ func (self *Server) WatchDnsmasqExtra(watchCh <-chan struct{}) {
 
 func (self *Server) WatchVip(watchCh <-chan struct{}) {
 	util.WatchConfig(self.log, self.lainlet, EtcdVipPrefixKey, watchCh, func(datas interface{}) {
+		lastIp := self.FetchVip()
 		if len(datas.(map[string]interface{})) == 0 {
 			self.vip = ""
 		} else {
@@ -54,6 +60,9 @@ func (self *Server) WatchVip(watchCh <-chan struct{}) {
 			}
 		}
 		ip := self.FetchVip()
+		if lastIp == ip {
+			return
+		}
 		for i, _ := range self.domains {
 			self.domains[i].ip = ip
 		}
