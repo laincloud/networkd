@@ -3,9 +3,11 @@ package main
 import (
 	"crypto/md5"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/laincloud/networkd/hashmap"
-	"sync"
 )
 
 const (
@@ -105,6 +107,7 @@ func (self *Server) AddVirtualIp(ip string, port string, config JSONVirtualIpCon
 		item.ports[v.Src] = port
 	}
 	item.excludedNodes = config.ExcludedNodes
+	log.Debug("add vip item: ", item)
 	self.vDb.Add(item)
 }
 
@@ -223,6 +226,7 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 				// arp
 				item.BroadcastIp(self.iface)
 			}
+			item.MaintainCalicoRule()
 		case LockerStateUnlocked:
 			item.DeleteIp(self.iface)
 		case LockerStateError:
@@ -596,6 +600,39 @@ func (self *VirtualIpItem) CreateCalicoRule(config *VirtualIpPortItem, libnetwor
 		return false
 	}
 	return true
+}
+
+func (self *VirtualIpItem) MaintainCalicoRule() {
+	oldCalicoRules := doCalicoProfileRuleShow(self.appName)
+	rules := strings.Split(oldCalicoRules, "\n")
+	ports := make(map[string]string)
+	for _, s := range rules {
+		if strings.Contains(s, "Outbound rules:") {
+			break
+		}
+		if strings.Contains(s, "Inbound rules:") {
+			continue
+		}
+		words := strings.Fields(s)
+		if len(words) != 6 {
+			continue
+		}
+		if _, ok := self.ports[words[5]]; !ok {
+			// TODO more carefully when delete
+			// if etcd or lainlet is down, should not delete calio rules
+			if self.appName == "streamrouter" && len(self.ports) != 0 {
+				doCalicoDeleteProfileRule(self.appName, words[2], words[5])
+			}
+		} else {
+			ports[words[5]] = words[2]
+		}
+	}
+	for port, config := range self.ports {
+		if _, ok := ports[port]; !ok {
+			log.Info("add calico rule:", self.ip, port)
+			doCalicoAddProfileRule(self.appName, config.proto, port)
+		}
+	}
 }
 
 func (self *VirtualIpItem) CleanRule(cont *ContainerItem) {
