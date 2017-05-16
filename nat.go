@@ -416,6 +416,7 @@ func doCalicoAddProfileRule(name string, proto string, port string) bool {
 		"add", "inbound", "--at=1",
 		"allow", proto, "to", "ports", port,
 	}
+	log.Info(cmdName, cmdArgs)
 	out, err := util.DoCmd(cmdName, cmdArgs)
 	if err == nil {
 		// added or existed
@@ -451,5 +452,40 @@ func doCalicoAddProfileDefaultRule(name string) bool {
 }
 
 //TODO(xutao) doCalicoDeleteProfile
+
 //TODO(xutao) doCalicoDeleteProfileRule
+func doCalicoDeleteProfileRule(name string, proto string, port string) bool {
+	// calicoctl profile {{ item }} rule remove inbound allow udp to ports 53
+	cmdName := "calicoctl"
+	cmdArgs := []string{
+		"profile", name, "rule",
+		"remove", "inbound",
+		"allow", proto, "to", "ports", port,
+	}
+	log.Info(cmdName, cmdArgs)
+	out, err := util.DoCmd(cmdName, cmdArgs)
+	if err == nil {
+		// deleted
+		return true
+	}
+	message := out.String()
+	log.Print(message)
+	log.Error(err)
+	return false
+}
+
 //TODO(xutao) doCalicoDeleteProfileDefaultRule
+
+func doCalicoProfileRuleShow(name string) string {
+	cmdName := "calicoctl"
+	cmdArgs := []string{
+		"profile", name, "rule",
+		"show",
+	}
+	out, err := util.DoCmd(cmdName, cmdArgs)
+	if err != nil {
+		log.Error(err)
+	}
+	message := out.String()
+	return message
+}

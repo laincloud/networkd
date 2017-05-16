@@ -165,6 +165,9 @@ func getDeletedVips(oldVipList []string, newVipList []string) []string {
 }
 
 func (self *Server) DeleteLainVip(ip string) {
+	if ip == "" {
+		return
+	}
 	kv := self.libkv
 	key := fmt.Sprintf("%s/%s", EtcdLainVirtualIpKey, ip)
 	err := kv.Delete(key)
