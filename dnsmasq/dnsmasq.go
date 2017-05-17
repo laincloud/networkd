@@ -43,6 +43,7 @@ type Server struct {
 	domains        []AddressItem
 	lainlet        *lainlet.Client
 	log            *logrus.Logger
+	extra          bool
 	hostFilename   string
 	serverFilename string
 	domainFilename string
@@ -58,7 +59,7 @@ type JSONServerConfig struct {
 }
 
 func New(ip string, kv store.Store, lainlet *lainlet.Client, log *logrus.Logger,
-	host string, server string, domain string) *Server {
+	host string, server string, domain string, extra bool) *Server {
 	return &Server{
 		ip:             ip,
 		log:            log,
@@ -71,6 +72,7 @@ func New(ip string, kv store.Store, lainlet *lainlet.Client, log *logrus.Logger,
 		hostFilename:   host,
 		serverFilename: server,
 		domainFilename: domain,
+		extra:          extra,
 	}
 }
 
@@ -84,11 +86,12 @@ func (self *Server) RunDnsmasqd() {
 	defer close(stopExtraCh)
 	stopVipCh := make(chan struct{})
 	defer close(stopVipCh)
-
 	go self.WatchDnsmasqAddress(stopAddressCh)
 	go self.WatchDnsmasqServer(stopServerCh)
-	go self.WatchDnsmasqExtra(stopExtraCh)
-	go self.WatchVip(stopVipCh)
+	if self.extra {
+		go self.WatchDnsmasqExtra(stopExtraCh)
+		go self.WatchVip(stopVipCh)
+	}
 	for {
 		select {
 		case <-self.eventCh:
