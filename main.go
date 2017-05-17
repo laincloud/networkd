@@ -36,6 +36,7 @@ func main() {
 		streamrouter    = flag.Bool("streamrouter", false, "Enable/Disable watch streamrouter vips and ports.")
 		deployd         = flag.Bool("deployd", false, "Enable/Disable watch deployd ip.")
 		dnsmasq         = flag.Bool("dnsmasq", false, "Enable/Disable dnsmasq.")
+		extra           = flag.Bool("extra", false, "Enable/Disable extrad domain monitor.")
 		acl             = flag.Bool("acl", false, "Enable/Disable acl.")
 		dnsmasqHost     = flag.String("dnsmasq.host", "/etc/dnsmasq.hosts", "Dnsmasq host filename")
 		dnsmasqServer   = flag.String("dnsmasq.server", "/etc/dnsmasq.servers", "Dnsmasq server filename")
@@ -99,7 +100,7 @@ func main() {
 	server.InitDomain(*domain)
 
 	if *dnsmasq {
-		server.InitDnsmasq(*dnsmasqHost, *dnsmasqServer, *dnsmasqDomain)
+		server.InitDnsmasq(*dnsmasqHost, *dnsmasqServer, *dnsmasqDomain, *extra)
 	}
 
 	if *acl {

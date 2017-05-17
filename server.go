@@ -274,12 +274,12 @@ func (self *Server) InitAddress(ip string) {
 	log.Info(fmt.Sprintf("HostIP %s", self.ip))
 }
 
-func (self *Server) InitDnsmasq(host string, server string, domain string) {
+func (self *Server) InitDnsmasq(host string, server string, domain string, extra bool) {
 	// TODO(xutao) check host & server
 	self.dnsmasqHost = host
 	self.dnsmasqServer = server
 	self.dnsmasqDomain = domain
-	self.dnsmasq = dnsmasq.New(self.ip, self.libkv, self.lainlet, log, host, server, domain)
+	self.dnsmasq = dnsmasq.New(self.ip, self.libkv, self.lainlet, log, host, server, domain, extra)
 	self.tinydnsStopCh = make(chan struct{})
 	self.tinydnsIsRunning = false
 	self.swarmStopCh = make(chan struct{})
