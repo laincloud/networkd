@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
+
 	"github.com/docker/leadership"
 	"github.com/docker/libkv"
 	"github.com/docker/libkv/store"
@@ -21,6 +22,9 @@ import (
 	lainlet "github.com/laincloud/lainlet/client"
 	"github.com/laincloud/networkd/acl"
 	"github.com/laincloud/networkd/dnsmasq"
+	"github.com/projectcalico/libcalico-go/lib/api"
+	calicoetcd "github.com/projectcalico/libcalico-go/lib/backend/etcd"
+	calico "github.com/projectcalico/libcalico-go/lib/client"
 )
 
 const (
@@ -47,6 +51,7 @@ type Server struct {
 	wg            sync.WaitGroup
 	docker        *docker.Client
 	etcd          *etcd.Client
+	calico        *calico.Client
 	libkv         store.Store
 	lainlet       *lainlet.Client
 	vDb           *VirtualIpDb
@@ -176,6 +181,22 @@ func (self *Server) InitEtcd(endpoint string) {
 	}
 	self.etcd = &c
 	// TODO(xutao) check etcd status
+}
+
+func (self *Server) InitCalico(endpoint string) {
+	config := api.CalicoAPIConfig{
+		Spec: api.CalicoAPIConfigSpec{
+			DatastoreType: api.EtcdV2,
+			EtcdConfig: calicoetcd.EtcdConfig{
+				EtcdEndpoints: endpoint,
+			},
+		},
+	}
+	c, err := calico.New(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	self.calico = c
 }
 
 func (self *Server) InitLibkv(endpoint string) {

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"crypto/md5"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -25,6 +23,7 @@ var VirtualIpState = [5]string{
 }
 
 type VirtualIpPortItem struct {
+	// TODO(liuxu) port should be uint16
 	port              string
 	proto             string
 	containerPort     string
@@ -226,7 +225,7 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 				// arp
 				item.BroadcastIp(self.iface)
 			}
-			item.MaintainCalicoRule()
+			self.ApplyCalicoProfile(item)
 		case LockerStateUnlocked:
 			item.DeleteIp(self.iface)
 		case LockerStateError:
@@ -264,13 +263,13 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 		case LockerStateCreated:
 			item.CreateIpRule(&config)
 			// calico
-			item.CreateCalicoRule(&config, self.libnetwork)
+			self.AddCalicoRule(item.appName, "allow", config.proto, config.port)
 		case LockerStateLocked:
 			vi, _ := self.vDb.GetVirtualIp(item)
 			item.CreateIpRule(&config)
 			if vi.state == VirtualIpStateCreated || vi.state == VirtualIpStateUnused {
 				// calico
-				item.CreateCalicoRule(&config, self.libnetwork)
+				self.AddCalicoRule(item.appName, "allow", config.proto, config.port)
 				self.CreateAppKey(item)
 			}
 		case LockerStateUnlocked:
@@ -585,56 +584,6 @@ func (self *VirtualIpItem) DeleteIpRule(config *VirtualIpPortItem) bool {
 	return true
 }
 
-func (self *VirtualIpItem) CreateCalicoRule(config *VirtualIpPortItem, libnetwork bool) bool {
-	profileName := self.appName
-	if !libnetwork {
-		// backwards-compatible for lain 1.0.X
-		profileName = fmt.Sprintf("%x", md5.Sum([]byte(self.appName)))
-		if !doCalicoAddProfileDefaultRule(profileName) {
-			doCalicoAddProfile(profileName)
-			doCalicoAddProfileDefaultRule(profileName)
-		}
-	}
-
-	if !doCalicoAddProfileRule(profileName, config.proto, config.containerPort) {
-		return false
-	}
-	return true
-}
-
-func (self *VirtualIpItem) MaintainCalicoRule() {
-	oldCalicoRules := doCalicoProfileRuleShow(self.appName)
-	rules := strings.Split(oldCalicoRules, "\n")
-	ports := make(map[string]string)
-	for _, s := range rules {
-		if strings.Contains(s, "Outbound rules:") {
-			break
-		}
-		if strings.Contains(s, "Inbound rules:") {
-			continue
-		}
-		words := strings.Fields(s)
-		if len(words) != 6 {
-			continue
-		}
-		if _, ok := self.ports[words[5]]; !ok {
-			// TODO more carefully when delete
-			// if etcd or lainlet is down, should not delete calio rules
-			if self.appName == "streamrouter" && len(self.ports) != 0 {
-				doCalicoDeleteProfileRule(self.appName, words[2], words[5])
-			}
-		} else {
-			ports[words[5]] = words[2]
-		}
-	}
-	for port, config := range self.ports {
-		if _, ok := ports[port]; !ok {
-			log.Info("add calico rule:", self.ip, port)
-			doCalicoAddProfileRule(self.appName, config.proto, port)
-		}
-	}
-}
-
 func (self *VirtualIpItem) CleanRule(cont *ContainerItem) {
 	if cont == nil || cont.ip == "" {
 		log.WithFields(logrus.Fields{
@@ -666,5 +615,3 @@ func (self *VirtualIpItem) CleanRule(cont *ContainerItem) {
 	}
 	self.next = nil
 }
-
-//TODO(xutao) DeleteCalicoRule
