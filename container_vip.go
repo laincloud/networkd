@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
+	"golang.org/x/net/context"
 	etcd "github.com/coreos/etcd/client"
 )
 

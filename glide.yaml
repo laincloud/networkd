@@ -7,7 +7,7 @@ import:
 - package: github.com/codegangsta/inject
   version: 33e0aa1cb7c019ccc3fbe049a8262a6403d30504
 - package: github.com/coreos/etcd
-  version: ff319add53326bfefa3b35cec6f684ae6b3685b0
+  version: d2716fc5ae7909a3b9651e31cfb0eba22b4920c3
   subpackages:
   - Godeps/_workspace/src/github.com/ugorji/go/codec
   - Godeps/_workspace/src/golang.org/x/net/context
@@ -75,7 +75,13 @@ import:
   - log
 - package: github.com/nightlyone/lockfile
   version: a1561a54b68a87116d98b65f71a4a5768da58325
-- package: golang.org/x/net/context
+- package: golang.org/x/net
   version: b6b3bda5547b9502d49ecf55b6897a112d6655db
-- package: golang.org/x/sys/unix
+  subpackages:
+  - context
+- package: golang.org/x/sys
   version: 833a04a10549a95dc34458c195cbad61bbb6cb4d
+  subpackages:
+  - unix
+- package: github.com/projectcalico/libcalico-go
+  version: ^1.2.2

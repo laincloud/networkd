@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	lainlet "github.com/laincloud/lainlet/client"
+	"golang.org/x/net/context"
 )
 
 var iptablesLock sync.Mutex
