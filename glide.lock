@@ -1,0 +1,87 @@
+hash: 4fca2cb4c5080453c26d2ef49b52271d9e81dda5c505d75d5859e1acee7ae147
+updated: 2017-05-22T15:42:46.471432465+08:00
+imports:
+- name: github.com/codegangsta/inject
+  version: 33e0aa1cb7c019ccc3fbe049a8262a6403d30504
+- name: github.com/coreos/etcd
+  version: ff319add53326bfefa3b35cec6f684ae6b3685b0
+  subpackages:
+  - Godeps/_workspace/src/github.com/ugorji/go/codec
+  - Godeps/_workspace/src/golang.org/x/net/context
+  - client
+  - pkg/pathutil
+  - pkg/types
+- name: github.com/docker/leadership
+  version: bfc7753dd48af19513b29deec23c364bf0f274eb
+- name: github.com/docker/libkv
+  version: 2a3d365c64a1cdda570493123392c8d800edf766
+  subpackages:
+  - store
+  - store/etcd
+- name: github.com/fsnotify/fsnotify
+  version: 629574ca2a5df945712d3079857300b5e4da0236
+- name: github.com/fsouza/go-dockerclient
+  version: e0d22d30691bcc996eca51f729a4777b8c7dc2a8
+  subpackages:
+  - external/github.com/Sirupsen/logrus
+  - external/github.com/docker/docker/opts
+  - external/github.com/docker/docker/pkg/archive
+  - external/github.com/docker/docker/pkg/fileutils
+  - external/github.com/docker/docker/pkg/homedir
+  - external/github.com/docker/docker/pkg/idtools
+  - external/github.com/docker/docker/pkg/ioutils
+  - external/github.com/docker/docker/pkg/longpath
+  - external/github.com/docker/docker/pkg/parsers
+  - external/github.com/docker/docker/pkg/pools
+  - external/github.com/docker/docker/pkg/promise
+  - external/github.com/docker/docker/pkg/stdcopy
+  - external/github.com/docker/docker/pkg/system
+  - external/github.com/docker/docker/pkg/ulimit
+  - external/github.com/docker/docker/pkg/units
+  - external/github.com/hashicorp/go-cleanhttp
+  - external/github.com/opencontainers/runc/libcontainer/user
+- name: github.com/go-martini/martini
+  version: 15a47622d6a9b3e6a1eaca2681e4850f612471ea
+- name: github.com/laincloud/deployd
+  version: a161c33d0da4ba1bc6648b9f19dc8d2ca4e1b312
+  subpackages:
+  - cluster
+  - engine
+  - storage
+- name: github.com/laincloud/lainlet
+  version: f9b447e76640833e7b47d7ae29494806f4f610b6
+  subpackages:
+  - api
+  - api/v2
+  - auth
+  - client
+  - store
+  - watcher
+  - watcher/config
+  - watcher/container
+  - watcher/depends
+  - watcher/nodes
+  - watcher/podgroup
+- name: github.com/mijia/adoc
+  version: b13894c1c54204ed818a345d2a5d7fc30f0c7239
+- name: github.com/mijia/go-generics
+  version: 2278a5f0de143e1d17ea16d56e7f85391bdb85a3
+- name: github.com/mijia/sweb
+  version: 4919e73674ef98e133d7f5e1d87c3963653c12b1
+  subpackages:
+  - log
+- name: github.com/nightlyone/lockfile
+  version: a1561a54b68a87116d98b65f71a4a5768da58325
+- name: github.com/Sirupsen/logrus
+  version: 446d1c146faa8ed3f4218f056fcd165f6bcfda81
+  subpackages:
+  - hooks/syslog
+- name: golang.org/x/net
+  version: b6b3bda5547b9502d49ecf55b6897a112d6655db
+  subpackages:
+  - context
+- name: golang.org/x/sys
+  version: 833a04a10549a95dc34458c195cbad61bbb6cb4d
+  subpackages:
+  - unix
+testImports: []

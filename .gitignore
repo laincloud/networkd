@@ -1,2 +1,4 @@
 networkd
 *DS_Store
+vendor/
+.idea/
