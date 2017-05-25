@@ -88,6 +88,7 @@ func main() {
 	server.InitLibNetwork(*libnetwork)
 	server.InitDocker(*dockerEndpoint)
 	server.InitEtcd(*etcdEndpoint)
+	server.InitCalico(*etcdEndpoint)
 	server.InitInterface(*netInterface)
 	server.InitHostname(*hostname)
 	server.InitAddress(*netAddress)

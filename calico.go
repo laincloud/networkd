@@ -15,11 +15,6 @@ func (s *Server) AddCalicoRule(profileName string, action string, protocol strin
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, item := range profile.Spec.IngressRules {
-		if item.Action == action && item.Protocol.StrVal == protocol && len(item.Destination.Ports) == 1 && item.Destination.Ports[0].MaxPort == uint16(p) && item.Destination.Ports[0].MinPort == uint16(p) {
-			return true
-		}
-	}
 	rule := api.Rule{}
 	rule.Action = action
 	proto := numorstring.ProtocolFromString(protocol)

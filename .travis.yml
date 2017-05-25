@@ -8,7 +8,6 @@ install:
 - go get github.com/Masterminds/glide
 before_script: 
 script:
-- glide install
 - ./build.sh
 deploy:
   provider: releases
