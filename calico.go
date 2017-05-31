@@ -20,7 +20,21 @@ func (s *Server) AddCalicoRule(profileName string, action string, protocol strin
 	proto := numorstring.ProtocolFromString(protocol)
 	rule.Protocol = &proto
 	rule.Destination.Ports = []numorstring.Port{numorstring.SinglePort(uint16(p))}
-	profile.Spec.IngressRules = append(profile.Spec.IngressRules, rule)
+	if action == "allow" {
+		rules := []api.Rule{rule}
+		for _, ingressRule := range profile.Spec.IngressRules {
+			rules = append(rules, ingressRule)
+		}
+		profile.Spec.IngressRules = rules
+	} else if action == "deny" {
+		rules := []api.Rule{rule}
+		for _, egressRule := range profile.Spec.EgressRules {
+			rules = append(rules, egressRule)
+		}
+		profile.Spec.EgressRules = rules
+	} else {
+		log.Fatal("action " + action + " is not allow or deny")
+	}
 	_, err = s.calico.Profiles().Apply(profile)
 	if err != nil {
 		log.Fatal(err)
