@@ -43,8 +43,11 @@ func (s *Server) AddCalicoRule(profileName string, action string, protocol strin
 }
 
 func (s *Server) ApplyCalicoProfile(virtualIpItem *VirtualIpItem) bool {
-	profile := api.NewProfile()
-	profile.Metadata = api.ProfileMetadata{Name: virtualIpItem.appName}
+	profile, err := s.calico.Profiles().Get(api.ProfileMetadata{Name: virtualIpItem.appName})
+	if err != nil {
+		log.Fatal(err)
+	}
+	rules := []api.Rule{}
 	for _, v := range virtualIpItem.ports {
 		port, err := strconv.ParseUint(v.port, 10, 16)
 		if err != nil {
@@ -55,9 +58,10 @@ func (s *Server) ApplyCalicoProfile(virtualIpItem *VirtualIpItem) bool {
 		proto := numorstring.ProtocolFromString(v.proto)
 		rule.Protocol = &proto
 		rule.Destination.Ports = []numorstring.Port{numorstring.SinglePort(uint16(port))}
-		profile.Spec.IngressRules = append(profile.Spec.IngressRules, rule)
+		rules = append(rules, rule)
 	}
-	_, err := s.calico.Profiles().Apply(profile)
+	profile.Spec.IngressRules = rules
+	_, err = s.calico.Profiles().Apply(profile)
 	if err != nil {
 		log.Fatal(err)
 	}
