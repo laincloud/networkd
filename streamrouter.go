@@ -186,6 +186,9 @@ func (self *Server) SetStreamRouterVips(conf *StreamRouterConfig) {
 	kv := self.libkv
 	value := []byte(conf.getConfigValue())
 	for _, ip := range conf.vips {
+		if ip == "" {
+			continue
+		}
 		key := fmt.Sprintf("%s/%s", EtcdLainVirtualIpKey, ip)
 		err := kv.Put(key, value, nil)
 		if err != nil {
