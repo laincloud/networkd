@@ -263,13 +263,13 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 		case LockerStateCreated:
 			item.CreateIpRule(&config)
 			// calico
-			self.AddCalicoRule(item.appName, "allow", config.proto, config.port)
+			self.AddCalicoRule(item.appName, "allow", config.proto, config.containerPort)
 		case LockerStateLocked:
 			vi, _ := self.vDb.GetVirtualIp(item)
 			item.CreateIpRule(&config)
 			if vi.state == VirtualIpStateCreated || vi.state == VirtualIpStateUnused {
 				// calico
-				self.AddCalicoRule(item.appName, "allow", config.proto, config.port)
+				self.AddCalicoRule(item.appName, "allow", config.proto, config.containerPort)
 				self.CreateAppKey(item)
 			}
 		case LockerStateUnlocked:
