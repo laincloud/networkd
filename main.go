@@ -11,7 +11,7 @@ import (
 	"runtime"
 )
 
-const Version = "0.1.17"
+const Version = "2.3.0"
 
 var log = logrus.New()
 
