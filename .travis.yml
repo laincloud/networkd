@@ -1,18 +1,21 @@
-sudo: required
+sudo: false
 language: go
-services:
-- docker
 go:
-- 1.8.1
+- 1.8.x
 install:
 - go get github.com/Masterminds/glide
-before_script: 
+before_script:
+- glide install
 script:
-- ./build.sh
+- go build -o bin/networkd .
+after_success:
+- xz -9k bin/networkd
 deploy:
   provider: releases
   api_key:
     secure: lzmOGP5CoXzvzYAbBVxc68OLgDE9Es6URjp/Lwm8ylPSVI/qd4DSSMnutZKgqlI1jRBylTH4CNOK5go4tpEyArCdWWxOWDT0x0VXWI/w1+Vyj2AR1d1DVYgyaDm7niehnrEt3rFCXPcExu0CLgKkGf1O2ap5EnQYxsBOoSlHgyYieOfuJdGYIJVKQC0lvqySqb7cqcDfixDHk775mxhYv/uxwvxxV3QXew7FANV/+bCcOHwcTFVT4t4PoNZwJ26L7u/KwK1IcYFR0QcSkU9RC+gi2YCIGEnKq5LFlUbUVtjBJEXzbkqEcvWOw3GzYi/z/tWsfyWheNfXq73HlQuagCsIx1qerGr7trLBwRJA+X0HZ3SLoiRJjMt2aovqfhus9KZJ3oX7WyUPJiZG/o29j2GLD8XE5m6UDUVkVf/6QdNhvO9pGOjOcyrD5BFNZGPndpNaFna16ZKG0sQBe1utIZP+mPHtOACOgFaZrm11viX4JxH+JRehu0pYwslFhNhVt3AzFlj3u7lG2iM+E3SO5fQSV7DLQ8o6XbQmDQmWWUFy8wlc0RCgZJ7C0ldWiRdY8B9OQHkGsLGQ160W//L2xk/+6pEj6SCc9/Rf+Qf5KQ0xA6ctsWpL6nXdkPD2kxyt5JCQbwibydfyGzJXg7u9IpBUgmTpvE20xBipPuy8NXI=
-  file: bin/networkd
+  file:
+  - bin/networkd
+  - bin/networkd.xz
   on:
     tags: true
