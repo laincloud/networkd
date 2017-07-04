@@ -22,7 +22,7 @@ layer 0 network daemon.
 - key: /lain/config/vips/{IP}
 - value:
 
-    ```json
+    ```javascript
     {
         "app": "APP1", # lain app name, required
         "proc": "PROC1", # lain app proc name, required
