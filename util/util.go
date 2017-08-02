@@ -101,8 +101,11 @@ func WatchConfig(log *logrus.Logger, lainlet *lainlet.Client, configKeyPrefix st
 					continue
 				}
 				var addrs interface{}
-				err = json.Unmarshal(event.Data, &addrs)
-				callback(addrs)
+				if err = json.Unmarshal(event.Data, &addrs); err == nil {
+					callback(addrs)
+				} else {
+					log.Warnf("Fetch Lainlet data failed with err:%v", err)
+				}
 			case <-watchCh:
 				return
 			}
