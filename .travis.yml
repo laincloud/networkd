@@ -4,12 +4,16 @@ go:
 - 1.8.x
 install:
 - go get github.com/Masterminds/glide
+- go get github.com/aliyun/ossutil
 before_script:
 - glide install
 script:
 - go build -o bin/networkd .
 after_success:
 - xz -9k bin/networkd
+- if [ "$TRAVIS_TAG" != "" ]; then
+  ossutil cp bin/networkd.xz oss://lain/binary/networkd/releases/download/${TRAVIS_TAG}/networkd.xz -e {ENDPOINT} -i ${ACCESS_KEY_ID} -k ${ACCESS_KEY_SECRET};
+  fi
 deploy:
   provider: releases
   api_key:
