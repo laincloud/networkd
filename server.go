@@ -36,6 +36,10 @@ const (
 	LockerStateError    = iota
 )
 
+const (
+	DOMAINLAIN = "lain"
+)
+
 type LockedIp struct {
 	ip            string
 	modifiedIndex uint64
@@ -633,16 +637,30 @@ func (self *Server) ApplyWebrouterIps() {
 		return
 	}
 
-	// set tinydns key
-	data := []string{
-		fmt.Sprintf("+webrouter.lain:%s:300", servers[0]),
+	// update webrouter dns A Record
+	uniqServers := make(map[string]interface{})
+	for _, server := range servers {
+		uniqServers[server] = struct{}{}
+	}
+	data := make([]string, 0)
+	for server, _ := range uniqServers {
+		data = append(data, fmt.Sprintf("+webrouter.lain:%s:300", server))
 	}
 	self.AddTinydnsDomain("webrouter.lain", data)
+
+	// update main domain as DNS NS
+	domains := make([]string, 0)
 	if self.domain != "" {
-		domain := self.domain
-		data := []string{
-			fmt.Sprintf("+*.%s:%s:300", domain, servers[0]),
-			fmt.Sprintf(".%s:%s:a:300", domain, servers[0]),
+		domains = append(domains, self.domain)
+	}
+	if self.domain != DOMAINLAIN {
+		domains = append(domains, DOMAINLAIN)
+	}
+	for _, domain := range domains {
+		data := make([]string, 0)
+		for server, _ := range uniqServers {
+			data = append(data, fmt.Sprintf("+*.%s:%s:300", domain, server))
+			data = append(data, fmt.Sprintf(".%s:%s:a:300", domain, server))
 		}
 		self.AddTinydnsDomain(domain, data)
 	}
@@ -1476,6 +1494,7 @@ func (self *Server) RunLainlet() {
 				self.GcContainers()
 				self.ApplyVirtualIps()
 				self.GcVirtualIps()
+				self.ApplyTinyDnsVips()
 			case <-tickCh:
 				self.FetchContainers()
 				self.GcContainers()
