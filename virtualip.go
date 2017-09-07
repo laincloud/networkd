@@ -137,6 +137,43 @@ func (self *Server) GcVirtualIps() {
 	}
 }
 
+// update app vips A Record && Webrouter vips' NS
+func (self *Server) ApplyTinyDnsVips() {
+	ch := self.ListVirtualIps()
+	domainVips := make(map[string][]string)
+	webrouterVips := make([]string, 0)
+	for item := range ch {
+		if item.ip == "" || item.ip == "0.0.0.0" || item.ip == self.ip {
+			continue
+		}
+		domainVips[item.appName] = append(domainVips[item.appName],
+			fmt.Sprintf("+%s.lain:%s:300", item.appName, item.ip))
+		if item.appName == "webrouter" {
+			webrouterVips = append(webrouterVips, item.ip)
+		}
+	}
+	for appname, datas := range domainVips {
+		self.AddTinydnsDomain(appname+".lain", datas)
+	}
+
+	// set Webrouter vips' NS
+	domains := make([]string, 0)
+	if self.domain != "" {
+		domains = append(domains, self.domain)
+	}
+	if self.domain != DOMAINLAIN {
+		domains = append(domains, DOMAINLAIN)
+	}
+	for _, domain := range domains {
+		data := make([]string, 0)
+		for _, vip := range webrouterVips {
+			data = append(data, fmt.Sprintf("+*.%s:%s:300", domain, vip))
+			data = append(data, fmt.Sprintf(".%s:%s:a:300", domain, vip))
+		}
+		self.AddTinydnsDomain(domain, data)
+	}
+}
+
 func (self *Server) ApplyVirtualIps() {
 	ch := self.ListVirtualIps()
 	for item := range ch {
