@@ -23,5 +23,6 @@ deploy:
   file:
   - bin/networkd
   - bin/networkd.xz
+  skip_cleanup: true
   on:
     tags: true
