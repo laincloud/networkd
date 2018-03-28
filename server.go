@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -468,7 +469,14 @@ func (self *Server) WatchLainlet(watchKey string, stopCh <-chan struct{}, callba
 }
 
 func (self *Server) WatchLainletVirtualIps() {
+	var oldEventData []byte
 	self.WatchLainlet("/v2/configwatcher?target=vips&heartbeat=5", nil, func(event *lainlet.Response) {
+		if reflect.DeepEqual(event.Data, oldEventData) {
+			log.Warn("Ignore old data.")
+			return
+		}
+
+		oldEventData = event.Data
 		keyPrefixLength := len(LainLetVirtualIpKey) + 1
 		currentUnixTime := time.Now().Unix()
 		var vips interface{}
