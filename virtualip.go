@@ -61,14 +61,14 @@ type VirtualIpDb struct {
 	ips                   map[string]*VirtualIp
 }
 
-func (self *Server) InitVirtualIpDb() {
+func (self *Agent) InitVirtualIpDb() {
 	self.vDb = &VirtualIpDb{
 		db:  hashmap.NewHashMap(),
 		ips: make(map[string]*VirtualIp),
 	}
 }
 
-func (self *Server) AddVirtualIp(ip string, port string, config JSONVirtualIpConfig, currentUnixTime int64) {
+func (self *Agent) AddVirtualIp(ip string, port string, config JSONVirtualIpConfig, currentUnixTime int64) {
 	// TODO(xutao) check app & proc name
 	item := &VirtualIpItem{
 		ip:            ip,
@@ -110,7 +110,7 @@ func (self *Server) AddVirtualIp(ip string, port string, config JSONVirtualIpCon
 	self.vDb.Add(item)
 }
 
-func (self *Server) ListVirtualIps() <-chan *VirtualIpItem {
+func (self *Agent) ListVirtualIps() <-chan *VirtualIpItem {
 	ch := make(chan *VirtualIpItem)
 	go func() {
 		defer close(ch)
@@ -122,7 +122,7 @@ func (self *Server) ListVirtualIps() <-chan *VirtualIpItem {
 	return ch
 }
 
-func (self *Server) GcVirtualIps() {
+func (self *Agent) GcVirtualIps() {
 	// gc virtual ip ports
 	// gc virtual ips
 	ch := self.ListVirtualIps()
@@ -138,12 +138,12 @@ func (self *Server) GcVirtualIps() {
 }
 
 // update app vips A Record && Webrouter vips' NS
-func (self *Server) ApplyTinyDnsVips() {
+func (self *Agent) ApplyTinyDnsVips() {
 	ch := self.ListVirtualIps()
 	domainVips := make(map[string][]string)
 	webrouterVips := make([]string, 0)
 	for item := range ch {
-		if item.ip == "" || item.ip == "0.0.0.0" || item.ip == self.ip {
+		if item.ip == "" || item.ip == "0.0.0.0" {
 			continue
 		}
 		domainVips[item.appName] = append(domainVips[item.appName],
@@ -174,7 +174,19 @@ func (self *Server) ApplyTinyDnsVips() {
 	}
 }
 
-func (self *Server) ApplyVirtualIps() {
+//update webrouterVips in godns
+func (self *Agent) ApplyWebrouterVips() {
+	ch := self.ListVirtualIps()
+	webrouterVips := make([]string, 0)
+	for item := range ch {
+		if item.appName == "webrouter" {
+			webrouterVips = append(webrouterVips, item.ip)
+		}
+	}
+	self.godns.UpdateWebrouterVips(webrouterVips)
+}
+
+func (self *Agent) ApplyVirtualIps() {
 	ch := self.ListVirtualIps()
 	for item := range ch {
 		key := item.GetKey()
@@ -222,7 +234,7 @@ func (self *Server) ApplyVirtualIps() {
 	}
 }
 
-func (self *Server) IsValidPod(item *VirtualIpItem) bool {
+func (self *Agent) IsValidPod(item *VirtualIpItem) bool {
 	var rc = false
 	if _, ok := self.cDb.Get(item.containerName); ok {
 		rc = true
@@ -230,7 +242,7 @@ func (self *Server) IsValidPod(item *VirtualIpItem) bool {
 	return rc
 }
 
-func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
+func (self *Agent) ApplyVirtualIp(item *VirtualIpItem) bool {
 	log.WithFields(logrus.Fields{
 		"ip":    item.ip,
 		"state": item.State(),
@@ -316,7 +328,7 @@ func (self *Server) ApplyVirtualIp(item *VirtualIpItem) bool {
 	return true
 }
 
-func (self *Server) UnApplyVirtualIp(item *VirtualIpItem) bool {
+func (self *Agent) UnApplyVirtualIp(item *VirtualIpItem) bool {
 	log.WithFields(logrus.Fields{
 		"ip":    item.ip,
 		"state": item.State(),
@@ -370,7 +382,7 @@ func (self *Server) UnApplyVirtualIp(item *VirtualIpItem) bool {
 	return true
 }
 
-func (self *Server) IsFreeVirtualIp(item *VirtualIpItem) bool {
+func (self *Agent) IsFreeVirtualIp(item *VirtualIpItem) bool {
 	if item.port == "" {
 		if doIpAddrCheck(item.ip, self.iface) {
 			return false
@@ -382,7 +394,7 @@ func (self *Server) IsFreeVirtualIp(item *VirtualIpItem) bool {
 	return true
 }
 
-func (self *Server) IsAliveVirtualIp(ip string) bool {
+func (self *Agent) IsAliveVirtualIp(ip string) bool {
 	return doPing(ip)
 }
 

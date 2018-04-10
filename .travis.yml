@@ -3,10 +3,10 @@ language: go
 go:
 - 1.8.x
 install:
-- go get github.com/Masterminds/glide
+- go get -u github.com/golang/dep/cmd/dep
 - go get github.com/aliyun/ossutil
 before_script:
-- glide install
+- dep ensure
 script:
 - go build -o bin/networkd .
 - ./go.test.sh

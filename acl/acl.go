@@ -2,10 +2,11 @@ package acl
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	lainlet "github.com/laincloud/lainlet/client"
 	"github.com/laincloud/networkd/util"
-	"strings"
 )
 
 const IptablesNotFound = "iptables: No chain/target/match by that name.\n"

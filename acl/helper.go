@@ -1,9 +1,10 @@
 package acl
 
 import (
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/laincloud/networkd/util"
-	"strings"
 )
 
 func (self *Acl) removeOldRules(oldRules []*ipTablesRule) {
