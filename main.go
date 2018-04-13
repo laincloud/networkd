@@ -4,14 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	"github.com/nightlyone/lockfile"
-	"log/syslog"
 	"os"
 	"runtime"
 )
 
-const Version = "2.3.0"
+const Version = "2.3.3"
 
 var log = logrus.New()
 
@@ -29,18 +27,14 @@ func main() {
 		hostname        = flag.String("hostname", "", "Hostname")
 		netAddress      = flag.String("net.address", "", "Host IP address(default: net.interface's first ip)")
 		libnetwork      = flag.Bool("libnetwork", false, "Enable/Disable libnetwork.")
-		resolvConf      = flag.Bool("resolv.conf", false, "Enable/Disable watch /etc/resolv.conf")
 		tinydns         = flag.Bool("tinydns", false, "Enable/Disable watch tinydns ip.")
 		swarm           = flag.Bool("swarm", false, "Enable/Disable watch swarm ip.")
 		webrouter       = flag.Bool("webrouter", false, "Enable/Disable watch webrouter ip.")
 		streamrouter    = flag.Bool("streamrouter", false, "Enable/Disable watch streamrouter vips and ports.")
 		deployd         = flag.Bool("deployd", false, "Enable/Disable watch deployd ip.")
-		dnsmasq         = flag.Bool("dnsmasq", false, "Enable/Disable dnsmasq.")
-		extra           = flag.Bool("extra", false, "Enable/Disable extrad domain monitor.")
 		acl             = flag.Bool("acl", false, "Enable/Disable acl.")
-		dnsmasqHost     = flag.String("dnsmasq.host", "/etc/dnsmasq.hosts", "Dnsmasq host filename")
-		dnsmasqServer   = flag.String("dnsmasq.server", "/etc/dnsmasq.servers", "Dnsmasq server filename")
-		dnsmasqDomain   = flag.String("dnsmasq.domain", "/etc/dnsmasq.d/extra_domain.conf", "Dnsmasq extra domain filename")
+		dnsAddr         = flag.String("godns.addr", "127.0.0.1:53", "godnds' listen address")
+		apiAddr          = flag.String("api.addr", "127.0.0.1:3000", "api server's listen address")
 		printVersion    = flag.Bool("version", false, "Print the version and exit.")
 		verbose         = flag.Bool("verbose", false, "Print more info.")
 	)
@@ -57,12 +51,6 @@ func main() {
 		log.Level = logrus.DebugLevel
 	} else {
 		log.Level = logrus.InfoLevel
-	}
-	hook, err := logrus_syslog.NewSyslogHook("", "", syslog.LOG_INFO, "")
-	if err != nil {
-		log.Error("Unable to connect to local syslog daemon")
-	} else {
-		log.Hooks.Add(hook)
 	}
 
 	lock, err := lockfile.New(*lockFilename)
@@ -82,35 +70,29 @@ func main() {
 
 	defer lock.Unlock()
 
-	var server Server
-	server.InitFlag(*dnsmasq, *tinydns, *swarm, *webrouter, *deployd, *acl, *resolvConf, *streamrouter)
-	server.InitIptables()
-	server.InitLibNetwork(*libnetwork)
-	server.InitDocker(*dockerEndpoint)
-	server.InitEtcd(*etcdEndpoint)
-	server.InitCalico(*etcdEndpoint)
-	server.InitInterface(*netInterface)
-	server.InitHostname(*hostname)
-	server.InitAddress(*netAddress)
-	server.InitLibkv(*etcdEndpoint)
-	server.InitLainlet(*lainletEndPoint)
-	server.InitWebrouter()
-	server.InitStreamrouter()
-	server.InitDeployd()
-	server.InitResolvConf()
-	server.InitDomain(*domain)
+	var agt Agent
+	agt.InitFlag(*tinydns, *swarm, *webrouter, *deployd, *acl, *streamrouter)
+	agt.InitIptables()
+	agt.InitLibNetwork(*libnetwork)
+	agt.InitDocker(*dockerEndpoint)
+	agt.InitEtcd(*etcdEndpoint)
+	agt.InitCalico(*etcdEndpoint)
+	agt.InitInterface(*netInterface)
+	agt.InitHostname(*hostname)
+	agt.InitAddress(*netAddress)
+	agt.InitLibkv(*etcdEndpoint)
+	agt.InitLainlet(*lainletEndPoint)
+	agt.InitWebrouter()
+	agt.InitStreamrouter()
+	agt.InitDeployd()
+	agt.InitDomain(*domain)
 
-	if *dnsmasq {
-		server.InitDnsmasq(*dnsmasqHost, *dnsmasqServer, *dnsmasqDomain, *extra)
-	}
+	agt.InitGodns(*dnsAddr)
+	agt.InitApiServer(*apiAddr)
 
 	if *acl {
-		server.InitAcl()
+		agt.InitAcl()
 	}
 
-	if *resolvConf {
-		server.RunResolvConf()
-	}
-
-	server.Run()
+	agt.Run()
 }

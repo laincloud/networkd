@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bufio"
@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/fsnotify/fsnotify"
+	"github.com/laincloud/networkd/util"
 	"io"
 	"io/ioutil"
 	"net"
@@ -26,66 +26,10 @@ func (self *Server) InitResolvConf() {
 	}
 }
 
-func WatchResolvConf(stopWatchCh <-chan struct{}) <-chan int {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	eventCh := make(chan int)
-	go func() {
-		defer close(eventCh)
-		defer watcher.Close()
-		for {
-			select {
-			case event := <-watcher.Events:
-				log.WithFields(logrus.Fields{
-					"name":  event.Name,
-					"op":    event.Op,
-					"event": event,
-				}).Debug("Fsnotify event")
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					eventCh <- 1
-					log.WithFields(logrus.Fields{
-						"name": event.Name,
-					}).Info("Modified file")
-				}
-				if event.Op&fsnotify.Remove == fsnotify.Remove {
-					err = watcher.Add(ResolvConfFilename)
-					if err != nil {
-						log.WithFields(logrus.Fields{
-							"err": err,
-						}).Fatal("Fail to watch file")
-					}
-					eventCh <- 1
-					log.WithFields(logrus.Fields{
-						"name": event.Name,
-					}).Info("Modified file")
-				}
-			case err := <-watcher.Errors:
-				log.WithFields(logrus.Fields{
-					"err": err,
-				}).Error("Fsnotify event")
-			case <-stopWatchCh:
-				return
-			}
-		}
-	}()
-
-	err = watcher.Add(ResolvConfFilename)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"err":  err,
-			"file": ResolvConfFilename,
-		}).Fatal("Fail to watch file")
-	}
-	return eventCh
-}
-
 func UpdateResolvConf() {
 	contents, err := ioutil.ReadFile(ResolvConfFilename)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		glog.WithFields(logrus.Fields{
 			"err":  err,
 			"file": ResolvConfFilename,
 		}).Fatal("Cannot read file")
@@ -94,13 +38,13 @@ func UpdateResolvConf() {
 	reader := bytes.NewReader(contents)
 	hash, err := HashData(reader)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		glog.WithFields(logrus.Fields{
 			"err":  err,
 			"file": ResolvConfFilename,
 		}).Fatal("Cannot hash file")
 		return
 	}
-	log.WithFields(logrus.Fields{
+	glog.WithFields(logrus.Fields{
 		"hash":     hash,
 		"lastHash": lastHash,
 		"file":     ResolvConfFilename,
@@ -153,7 +97,7 @@ func UpdateResolvConf() {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.WithFields(logrus.Fields{
+		glog.WithFields(logrus.Fields{
 			"err":  err,
 			"file": ResolvConfFilename,
 		}).Fatal("Cannot read file")
@@ -162,7 +106,7 @@ func UpdateResolvConf() {
 
 	err = ioutil.WriteFile(ResolvConfFilename, updatedContents, 0644)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		glog.WithFields(logrus.Fields{
 			"err":  err,
 			"file": ResolvConfFilename,
 		}).Error("Cannot write file")
@@ -170,7 +114,7 @@ func UpdateResolvConf() {
 
 	hash, err = HashData(bytes.NewReader(updatedContents))
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		glog.WithFields(logrus.Fields{
 			"err":  err,
 			"file": ResolvConfFilename,
 		}).Error("Cannot hash file")
@@ -192,16 +136,20 @@ func (self *Server) RunResolvConf() {
 	if self.resolvConfIsRunning {
 		return
 	}
-	log.Info("Run resolvconf")
+	glog.Info("Run resolvconf")
 	self.resolvConfIsRunning = true
 	stopCh := make(chan struct{})
-	eventCh := WatchResolvConf(stopCh)
+	eventCh := make(chan interface{})
+	util.WatchFile(ResolvConfFilename, eventCh, stopCh)
 	go func() {
 		defer close(stopCh)
 		for {
 			select {
 			case <-eventCh:
 				UpdateResolvConf()
+				if self.resolver != nil {
+					self.resolver.UpdateResolvServers()
+				}
 			case <-self.resolvConfStopCh:
 				stopCh <- struct{}{}
 				return
@@ -212,7 +160,7 @@ func (self *Server) RunResolvConf() {
 
 func (self *Server) StopResolvConf() {
 	if self.resolvConfIsRunning {
-		log.Info("Stop resolvconf")
+		glog.Info("Stop resolvconf")
 		self.resolvConfIsRunning = false
 		self.resolvConfStopCh <- struct{}{}
 	}

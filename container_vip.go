@@ -18,7 +18,7 @@ func ProcVipsHealthy(appName string, procName string) bool {
 	return false
 }
 
-func (self *Server) isContainerVipBalanced(containerName string, added int) bool {
+func (self *Agent) isContainerVipBalanced(containerName string, added int) bool {
 	container, ok := self.cDb.Get(containerName)
 	if !ok {
 		log.WithFields(logrus.Fields{
@@ -67,7 +67,7 @@ func getTotalUsedVips(containerVips *etcd.Node) int {
 	return count
 }
 
-func (self *Server) setContainerVipStatus(containerName string, ip string, status int, isPrevExist bool) error {
+func (self *Agent) setContainerVipStatus(containerName string, ip string, status int, isPrevExist bool) error {
 	container, ok := self.cDb.Get(containerName)
 	if !ok {
 		log.WithFields(logrus.Fields{
@@ -122,22 +122,22 @@ func (self *Server) setContainerVipStatus(containerName string, ip string, statu
 	return nil
 }
 
-func (self *Server) AddContainerVip(containerName string, ip string) {
+func (self *Agent) AddContainerVip(containerName string, ip string) {
 	//container is alive and use the vip
 	self.setContainerVipStatus(containerName, ip, VirtualIpStateUsed, true)
 }
 
-func (self *Server) DeleteContainerVip(containerName string, ip string) {
+func (self *Agent) DeleteContainerVip(containerName string, ip string) {
 	//container is alive but not use the vip
 	self.setContainerVipStatus(containerName, ip, VirtualIpStateUnused, true)
 }
 
-func (self *Server) CreateContainerVipKey(containerName string, ip string) {
+func (self *Agent) CreateContainerVipKey(containerName string, ip string) {
 	// container is alive and wait to use the vip
 	self.setContainerVipStatus(containerName, ip, VirtualIpStateUnused, false)
 }
 
-func (self *Server) DeleteContainerVipKey(containerName string, ip string) {
+func (self *Agent) DeleteContainerVipKey(containerName string, ip string) {
 	// container is not alive
 	container, ok := self.cDb.Get(containerName)
 	if !ok {
@@ -157,6 +157,6 @@ func (self *Server) DeleteContainerVipKey(containerName string, ip string) {
 	}
 }
 
-func (self *Server) DeleteContainerKey(containerName string) {
+func (self *Agent) DeleteContainerKey(containerName string) {
 	//TODO
 }

@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/fsouza/go-dockerclient"
-	"github.com/laincloud/networkd/hashmap"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/fsouza/go-dockerclient"
+	"github.com/laincloud/networkd/hashmap"
 )
 
 type ContainerPortItem struct {
@@ -37,13 +38,13 @@ type ContainerDb struct {
 	latestUpdatedUnixTime int64
 }
 
-func (self *Server) InitContainerDb() {
+func (self *Agent) InitContainerDb() {
 	self.cDb = &ContainerDb{
 		db: hashmap.NewHashMap(),
 	}
 }
 
-func (self *Server) FetchContainers() {
+func (self *Agent) FetchContainers() {
 	currentUnixTime := time.Now().Unix()
 	containers, _ := self.docker.ListContainers(docker.ListContainersOptions{All: false})
 
@@ -81,7 +82,7 @@ func (self *Server) FetchContainers() {
 	self.cDb.SetUpdatedUnixTime(currentUnixTime)
 }
 
-func (self *Server) FetchContainersByDocker() {
+func (self *Agent) FetchContainersByDocker() {
 	currentUnixTime := time.Now().Unix()
 	containers, _ := self.docker.ListContainers(docker.ListContainersOptions{All: false})
 	for _, container := range containers {
@@ -124,7 +125,7 @@ func (self *Server) FetchContainersByDocker() {
 	self.cDb.SetUpdatedUnixTime(currentUnixTime)
 }
 
-func (self *Server) GcContainers() {
+func (self *Agent) GcContainers() {
 	items := self.cDb.GetAll()
 	currentUnixTime := self.cDb.GetUpdatedUnixTime()
 	for _, item := range items {
@@ -139,7 +140,7 @@ func (self *Server) GcContainers() {
 	}
 }
 
-func (self *Server) ListContainers() ContainerItems {
+func (self *Agent) ListContainers() ContainerItems {
 	conts := make(ContainerItems)
 	containers, _ := self.docker.ListContainers(docker.ListContainersOptions{All: false})
 	for _, container := range containers {
@@ -157,7 +158,7 @@ func (self *Server) ListContainers() ContainerItems {
 	return conts
 }
 
-func (self *Server) InspectContainer(id string, config *ContainerItem) error {
+func (self *Agent) InspectContainer(id string, config *ContainerItem) error {
 	container, err := self.docker.InspectContainer(id)
 	if err != nil {
 		return err

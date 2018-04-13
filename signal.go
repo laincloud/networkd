@@ -35,7 +35,7 @@ func (set *signalSet) handle(sig os.Signal, arg interface{}) (err error) {
 	}
 }
 
-func (self *Server) RunSignal() {
+func (self *Agent) RunSignal() {
 	go func() {
 		ss := signalSetNew()
 		handler := func(s os.Signal, arg interface{}) {

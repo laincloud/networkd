@@ -80,24 +80,33 @@ vip: 192.168.10.254
         }
         ```
 
-## Dnsmasq
+## Dns
+Networkd contains a embedded dns server similar to dnsmasq.
+All resolvable domains from etcd are configured in /lain/config/domains.
 
-1. configuration for dnsmasq hosts & servers
-1. dnsmasq version >= 2.69
+1. key
+   - exact domain, e.g., `/lain/config/domains/etcd.lain`, `/lain/config/domains/docker.lain`.
+   - wildcard domain begins with `*.`, e.g., `/lain/config/domains/*.lain`, `/lain/config/domains/*.lain.local`.
+2. value
+   - type `` to resolve to the specified IPs, e.g., `{"ips":["10.131.0.72"],"type":""}`.
+   - type `node` to resolve to node IP, e.g., `{"ips":[],"type":"node"}`.
+   - type `webrouter` to resolve to webrouter IPs, e.g., `{"ips":[],"type":"webrouter"}`.
+3. dump dns config
+   - `curl http://127.0.0.1:3000/v1/dns/config`
 
 ## Tinydns
 
-dynamic dnsmasq server conf of tinydns app
+dynamic dns server conf of tinydns app
 
 ## Swarm
 
-1. dynamic dnsmasq host conf of swarm manager
+1. dynamic dns host conf of swarm manager
     1. `swarm.lain`
 2. `/lain/swarm/docker/swarm/leader`
 
 ## Deployd
 
-1. dynamic dnsmasq host conf of deployd
+1. dynamic dns host conf of deployd
     1. `deployd.lain`
 1. `/lain/deployd/leader`
 
@@ -108,13 +117,14 @@ dynamic dnsmasq server conf of tinydns app
 ## Resolv.conf
 
 1. Watch /etc/resolv.conf
-1. Ensure `nameserver 127.0.0.1` in the first line.
-1. Remove `rotate` options
+2. Ensure `nameserver 127.0.0.1` in the first line.
+3. synchronize name servers from /etc/resolv.conf
+4. Remove `rotate` options
 
 ## TODO
 
 1. Split lock & health goroutine
-1. Print iptables acl rules
+2. Print iptables acl rules
 
 ## License
 

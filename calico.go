@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-func (s *Server) AddCalicoRule(ruleType, profileName, action, protocol, port string) error {
+func (s *Agent) AddCalicoRule(ruleType, profileName, action, protocol, port string) error {
 
 	p, err := strconv.ParseUint(port, 10, 16)
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *Server) AddCalicoRule(ruleType, profileName, action, protocol, port str
 	return nil
 }
 
-func (s *Server) ApplyCalicoProfile(virtualIpItem *VirtualIpItem) {
+func (s *Agent) ApplyCalicoProfile(virtualIpItem *VirtualIpItem) {
 	for _, v := range virtualIpItem.ports {
 		s.AddCalicoRule("ingress", virtualIpItem.appName, "allow", v.proto, v.port)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	lainlet "github.com/laincloud/lainlet/client"
 	"golang.org/x/net/context"
+	"github.com/fsnotify/fsnotify"
 )
 
 var iptablesLock sync.Mutex
@@ -114,5 +115,59 @@ func WatchConfig(log *logrus.Logger, lainlet *lainlet.Client, configKeyPrefix st
 			}
 		}
 		log.Error("Fail to watch lainlet")
+	}
+}
+
+func WatchFile(file string, eventCh chan interface{}, stopWatchCh <-chan struct{}) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		defer close(eventCh)
+		defer watcher.Close()
+		for {
+			select {
+			case event := <-watcher.Events:
+				log.WithFields(logrus.Fields{
+					"name":  event.Name,
+					"op":    event.Op,
+					"event": event,
+				}).Debug("Fsnotify event")
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					eventCh <- 1
+					log.WithFields(logrus.Fields{
+						"name": event.Name,
+					}).Info("Modified file")
+				}
+				if event.Op&fsnotify.Remove == fsnotify.Remove {
+					err = watcher.Add(file)
+					if err != nil {
+						log.WithFields(logrus.Fields{
+							"err": err,
+						}).Fatal("Fail to watch file")
+					}
+					eventCh <- 1
+					log.WithFields(logrus.Fields{
+						"name": event.Name,
+					}).Info("Modified file")
+				}
+			case err := <-watcher.Errors:
+				log.WithFields(logrus.Fields{
+					"err": err,
+				}).Error("Fsnotify event")
+			case <-stopWatchCh:
+				return
+			}
+		}
+	}()
+
+	err = watcher.Add(file)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"err":  err,
+			"file": file,
+		}).Fatal("Fail to watch file")
 	}
 }

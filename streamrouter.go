@@ -56,7 +56,7 @@ func (conf *StreamRouterConfig) setConfigPorts(ports []int) {
 	}
 }
 
-func (self *Server) RunStreamrouter() {
+func (self *Agent) RunStreamrouter() {
 	if self.streamrouterIsRunning {
 		return
 	}
@@ -87,7 +87,7 @@ func (self *Server) RunStreamrouter() {
 	}()
 }
 
-func (self *Server) StopStreamrouter() {
+func (self *Agent) StopStreamrouter() {
 	if self.streamrouterIsRunning {
 		log.Debug("stop streamrouter")
 		self.streamrouterIsRunning = false
@@ -95,7 +95,7 @@ func (self *Server) StopStreamrouter() {
 	}
 }
 
-func (self *Server) WatchStreamRouter(conf *StreamRouterConfig, stopWatchCh <-chan struct{}) (<-chan int, <-chan int) {
+func (self *Agent) WatchStreamRouter(conf *StreamRouterConfig, stopWatchCh <-chan struct{}) (<-chan int, <-chan int) {
 	vipEventCh := make(chan int)
 	portEventCh := make(chan int)
 	watchKey := fmt.Sprintf("/v2/configwatcher?target=%s&heartbeat=5", StreamrouterVippoolKey)
@@ -164,7 +164,7 @@ func getDeletedVips(oldVipList []string, newVipList []string) []string {
 	return ret
 }
 
-func (self *Server) DeleteLainVip(ip string) {
+func (self *Agent) DeleteLainVip(ip string) {
 	if ip == "" {
 		return
 	}
@@ -179,7 +179,7 @@ func (self *Server) DeleteLainVip(ip string) {
 	}
 }
 
-func (self *Server) SetStreamRouterVips(conf *StreamRouterConfig) {
+func (self *Agent) SetStreamRouterVips(conf *StreamRouterConfig) {
 	// etcd key: /lain/config/vips/$vip
 	conf.lock.Lock()
 	defer conf.lock.Unlock()
