@@ -6,6 +6,7 @@ import (
 	"github.com/projectcalico/libcalico-go/lib/api"
 	"github.com/projectcalico/libcalico-go/lib/numorstring"
 	"strconv"
+	"errors"
 )
 
 func (s *Agent) AddCalicoRule(ruleType, profileName, action, protocol, port string) error {
@@ -30,6 +31,7 @@ func (s *Agent) AddCalicoRule(ruleType, profileName, action, protocol, port stri
 		}).Error("get profile " + profileName + " error")
 		return err
 	}
+	log.WithField("profile", *profile).Info("calico profile dump after get")
 
 	if ruleType == "ingress" {
 		var rules []api.Rule
@@ -89,6 +91,12 @@ func (s *Agent) AddCalicoRule(ruleType, profileName, action, protocol, port stri
 		profile.Spec.EgressRules = rules
 	}
 
+	log.WithField("profile", *profile).Info("calico profile dump before set")
+	if len(profile.Spec.EgressRules) == 0 {
+		errMsg := "calico profile error: there should be at least one egress rule"
+		log.Error(errMsg)
+		return errors.New(errMsg)
+	}
 	_, err = s.calico.Profiles().Apply(profile)
 	if err != nil {
 		log.WithFields(logrus.Fields{
