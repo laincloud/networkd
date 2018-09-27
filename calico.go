@@ -30,6 +30,7 @@ func (s *Agent) AddCalicoRule(ruleType, profileName, action, protocol, port stri
 		}).Error("get profile " + profileName + " error")
 		return err
 	}
+	log.WithField("profile", *profile).Info("calico profile dump after get")
 
 	if ruleType == "ingress" {
 		var rules []api.Rule
@@ -89,6 +90,7 @@ func (s *Agent) AddCalicoRule(ruleType, profileName, action, protocol, port stri
 		profile.Spec.EgressRules = rules
 	}
 
+	log.WithField("profile", *profile).Info("calico profile dump before set")
 	_, err = s.calico.Profiles().Apply(profile)
 	if err != nil {
 		log.WithFields(logrus.Fields{
